@@ -1,0 +1,32 @@
+name: Testsigma Test Case Generation on PR
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, develop]
+jobs:
+  trigger-testsigma:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - run: npm install
+      - run: npm test
+      - name: Trigger Testsigma Plugin
+        run: |
+          curl -X POST "${{ secrets.TESTSIGMA_PLUGIN_URL }}/generate" \
+            -H "Authorization: Bearer ${{ secrets.TESTSIGMA_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"pr_number":"${{ github.event.pull_request.number }}","pr_title":"${{ github.event.pull_request.title }}","branch":"${{ github.head_ref }}","repo":"${{ github.repository }}","commit_sha":"${{ github.sha }}"}'
+      - uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ **Testsigma Plugin triggered.** Test cases are being generated and sent to TMS.'
+            })

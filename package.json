@@ -1,0 +1,35 @@
+{
+  "name": "shopease-ecommerce",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --testPathPattern=tests/ --forceExit --verbose"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/javvadikrishna7-coder/shopease-ecommerce.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/javvadikrishna7-coder/shopease-ecommerce/issues"
+  },
+  "homepage": "https://github.com/javvadikrishna7-coder/shopease-ecommerce#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "jest": "^30.3.0",
+    "supertest": "^7.2.2"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  }
+}
