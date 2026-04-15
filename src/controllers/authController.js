@@ -1,4 +1,6 @@
 const users = [];
+const activeTokens = new Set();
+exports.activeTokens = activeTokens;
 exports.register = (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'All fields required' });
@@ -11,6 +13,11 @@ exports.login = (req, res) => {
   const { email, password } = req.body;
   const user = users.find(u => u.email === email && u.password === password);
   if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-  res.json({ message: 'Login successful', token: `fake-jwt-${user.id}`, userId: user.id });
+  const token = `fake-jwt-${user.id}-${Date.now()}`;
+  activeTokens.add(token);
+  res.json({ message: 'Login successful', token, userId: user.id });
 };
-exports.logout = (req, res) => res.json({ message: 'Logged out successfully' });
+exports.logout = (req, res) => {
+  activeTokens.delete(req.token);
+  res.json({ message: 'Logged out successfully' });
+};
