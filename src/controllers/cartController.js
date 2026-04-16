@@ -24,6 +24,11 @@ exports.removeItem = (req, res) => {
   recalculate();
   res.json({ message: 'Item removed', cart });
 };
+exports.getItem    = (req, res) => {
+  const item = cart.items.find(i => i.productId === req.params.productId);
+  if (!item) return res.status(404).json({ error: 'Item not in cart' });
+  res.json(item);
+};
 exports.clearCart  = (req, res) => {
   cart = { items: [], total: 0 };
   res.json({ message: 'Cart cleared', cart });
