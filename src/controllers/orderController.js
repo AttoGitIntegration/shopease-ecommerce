@@ -20,3 +20,8 @@ exports.cancelOrder  = (req, res) => {
   order.status = 'cancelled';
   res.json({ message: 'Order cancelled', order });
 };
+exports.getOrdersByUser = (req, res) => {
+  const userId = parseInt(req.params.userId);
+  const userOrders = orders.filter(o => o.userId === userId);
+  res.json({ orders: userOrders, total: userOrders.length });
+};

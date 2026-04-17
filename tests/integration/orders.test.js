@@ -24,4 +24,23 @@ describe('Orders API', () => {
     expect(res.status).toBe(200);
     expect(res.body.order.status).toBe('cancelled');
   });
+  test('GET /orders/user/:userId - get orders by user', async () => {
+    await request(app).post('/api/orders').send({
+      userId: 42,
+      items: [{ productId: 5, name: 'Keyboard', price: 1500, quantity: 2 }],
+      address: '7 Brigade Road, Bengaluru, KA 560001'
+    });
+    const res = await request(app).get('/api/orders/user/42');
+    expect(res.status).toBe(200);
+    expect(res.body.orders).toBeInstanceOf(Array);
+    expect(res.body.orders.length).toBeGreaterThan(0);
+    expect(res.body.orders[0].userId).toBe(42);
+    expect(typeof res.body.total).toBe('number');
+  });
+  test('GET /orders/user/:userId - empty array for unknown user', async () => {
+    const res = await request(app).get('/api/orders/user/99999');
+    expect(res.status).toBe(200);
+    expect(res.body.orders).toEqual([]);
+    expect(res.body.total).toBe(0);
+  });
 });
