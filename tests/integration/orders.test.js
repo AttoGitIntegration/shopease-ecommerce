@@ -8,7 +8,7 @@ describe('Orders API', () => {
       items: [{ productId: 1, name: 'Wireless Headphones', price: 2999, quantity: 1 }],
       address: '123 MG Road, Bengaluru, KA 560001'
     });
-    expect(res.status).toBe(202);
+    expect(res.status).toBe(201);
     orderId = res.body.order.id;
   });
   test('GET /orders - list all', async () => {
