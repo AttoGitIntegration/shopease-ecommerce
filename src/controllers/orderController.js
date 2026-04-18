@@ -16,7 +16,12 @@ exports.getOrderById = (req, res) => {
 exports.cancelOrder  = (req, res) => {
   const order = orders.find(o => o.id === parseInt(req.params.id));
   if (!order) return res.status(404).json({ error: 'Order not found' });
-  if (order.status === 'shipped') return res.status(400).json({ error: 'Cannot cancel shipped order' });
+  if (order.status === 'cancelled') return res.status(400).json({ error: 'Order already cancelled' });
+  if (order.status === 'shipped' || order.status === 'delivered') {
+    return res.status(400).json({ error: `Cannot cancel ${order.status} order` });
+  }
   order.status = 'cancelled';
+  order.cancelledAt = new Date();
+  order.cancellationReason = req.body?.reason || 'No reason provided';
   res.json({ message: 'Order cancelled', order });
 };
