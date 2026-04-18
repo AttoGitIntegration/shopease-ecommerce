@@ -1,5 +1,7 @@
 let cart = { items: [], total: 0 };
 const recalculate = () => { cart.total = cart.items.reduce((sum, i) => sum + i.price * i.quantity, 0); };
+exports.readCart   = () => cart;
+exports.resetCart  = () => { cart = { items: [], total: 0 }; };
 exports.getCart    = (req, res) => res.json(cart);
 exports.addItem    = (req, res) => {
   const { productId, name, price, quantity = 1 } = req.body;
