@@ -59,3 +59,49 @@ exports.rejectReturn = (req, res) => {
   order.refundAmount = 0;
   res.json({ message: 'Return request rejected', order });
 };
+exports.approveReturn = (req, res) => {
+  const order = orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status !== 'returned') {
+    return res.status(400).json({ error: `Cannot approve return for ${order.status} order` });
+  }
+  order.status = 'return_approved';
+  order.returnApprovedAt = new Date();
+  order.returnApprovalNote = req.body?.note || null;
+  res.json({ message: 'Return request approved', order });
+};
+exports.issueRefund = (req, res) => {
+  const order = orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status !== 'return_approved') {
+    return res.status(400).json({ error: `Cannot issue refund for ${order.status} order` });
+  }
+  const method = req.body?.method || 'original_payment';
+  order.status = 'refunded';
+  order.refundedAt = new Date();
+  order.refundAmount = order.total;
+  order.refundMethod = method;
+  order.refundTransactionId = `RFND-${Date.now()}-${order.id}`;
+  res.json({ message: 'Refund issued', order });
+};
+exports.getReturnStatus = (req, res) => {
+  const order = orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  const RETURN_STATES = ['returned', 'return_approved', 'return_rejected', 'refunded'];
+  if (!RETURN_STATES.includes(order.status)) {
+    return res.status(400).json({ error: 'No return initiated for this order' });
+  }
+  res.json({
+    orderId: order.id,
+    status: order.status,
+    returnReason: order.returnReason || null,
+    requestedAt: order.returnedAt || null,
+    approvedAt: order.returnApprovedAt || null,
+    rejectedAt: order.returnRejectedAt || null,
+    rejectionReason: order.returnRejectionReason || null,
+    refundedAt: order.refundedAt || null,
+    refundAmount: order.refundAmount ?? null,
+    refundMethod: order.refundMethod || null,
+    refundTransactionId: order.refundTransactionId || null
+  });
+};
