@@ -25,3 +25,23 @@ exports.cancelOrder  = (req, res) => {
   order.cancellationReason = req.body?.reason || 'No reason provided';
   res.json({ message: 'Order cancelled', order });
 };
+exports.returnOrder  = (req, res) => {
+  const order = orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status !== 'delivered') {
+    return res.status(400).json({ error: `Cannot return ${order.status} order` });
+  }
+  const reason = req.body?.reason;
+  if (!reason) return res.status(400).json({ error: 'reason required' });
+  const RETURN_WINDOW_DAYS = 30;
+  const deliveredAt = order.deliveredAt ? new Date(order.deliveredAt) : new Date(order.createdAt);
+  const daysSince = (Date.now() - deliveredAt.getTime()) / (1000 * 60 * 60 * 24);
+  if (daysSince > RETURN_WINDOW_DAYS) {
+    return res.status(400).json({ error: `Return window of ${RETURN_WINDOW_DAYS} days has expired` });
+  }
+  order.status = 'returned';
+  order.returnedAt = new Date();
+  order.returnReason = reason;
+  order.refundAmount = order.total;
+  res.json({ message: 'Order return initiated', order });
+};
