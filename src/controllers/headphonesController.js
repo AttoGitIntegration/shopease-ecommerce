@@ -36,6 +36,22 @@ exports.list = (req, res) => {
   res.json({ headphones: results, count: results.length });
 };
 
+exports.search = (req, res) => {
+  const { q, type, wireless, brand, minPrice, maxPrice, minRating } = req.query;
+  let results = [...headphones];
+  if (q) {
+    const term = q.toLowerCase();
+    results = results.filter(h => h.name.toLowerCase().includes(term) || h.brand.toLowerCase().includes(term));
+  }
+  if (type)             results = results.filter(h => h.type === type);
+  if (wireless != null) results = results.filter(h => h.wireless === (wireless === 'true'));
+  if (brand)            results = results.filter(h => h.brand.toLowerCase() === brand.toLowerCase());
+  if (minPrice)         results = results.filter(h => h.price >= parseInt(minPrice));
+  if (maxPrice)         results = results.filter(h => h.price <= parseInt(maxPrice));
+  if (minRating)        results = results.filter(h => h.rating >= parseFloat(minRating));
+  res.json({ results, count: results.length });
+};
+
 exports.getById = (req, res) => {
   const h = headphones.find(p => p.id === parseInt(req.params.id));
   if (!h) return res.status(404).json({ error: 'Headphones not found' });

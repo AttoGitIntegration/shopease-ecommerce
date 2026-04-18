@@ -1,4 +1,14 @@
 const router = require('express').Router();
+const { placeOrder, getOrders, getOrderById, cancelOrder, returnOrder, rejectReturn, approveReturn, issueRefund, getReturnStatus } = require('../controllers/orderController');
+router.post('/',                  placeOrder);
+router.get('/',                   getOrders);
+router.get('/:id',                getOrderById);
+router.put('/:id/cancel',         cancelOrder);
+router.put('/:id/return',         returnOrder);
+router.put('/:id/reject-return',  rejectReturn);
+router.put('/:id/approve-return', approveReturn);
+router.post('/:id/refund',        issueRefund);
+router.get('/:id/return-status',  getReturnStatus);
 const { placeOrder, getOrders, getOrderById, cancelOrder, getOrdersByUser } = require('../controllers/orderController');
 router.post('/',                placeOrder);
 router.get('/user/:userId',     getOrdersByUser);
