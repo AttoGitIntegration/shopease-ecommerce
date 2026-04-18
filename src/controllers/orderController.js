@@ -45,3 +45,17 @@ exports.returnOrder  = (req, res) => {
   order.refundAmount = order.total;
   res.json({ message: 'Order return initiated', order });
 };
+exports.rejectReturn = (req, res) => {
+  const order = orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status !== 'returned') {
+    return res.status(400).json({ error: `Cannot reject return for ${order.status} order` });
+  }
+  const reason = req.body?.reason;
+  if (!reason) return res.status(400).json({ error: 'reason required' });
+  order.status = 'return_rejected';
+  order.returnRejectedAt = new Date();
+  order.returnRejectionReason = reason;
+  order.refundAmount = 0;
+  res.json({ message: 'Return request rejected', order });
+};
