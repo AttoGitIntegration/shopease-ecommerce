@@ -20,6 +20,25 @@ exports.search  = (req, res) => {
   if (maxPrice) results = results.filter(p => p.price <= parseInt(maxPrice));
   res.json({ results, count: results.length });
 };
+exports.categories = (req, res) => {
+  const counts = products.reduce((acc, p) => {
+    acc[p.category] = (acc[p.category] || 0) + 1;
+    return acc;
+  }, {});
+  const categories = Object.entries(counts).map(([name, count]) => ({ name, count }));
+  res.json({ categories, total: categories.length });
+};
+exports.byCategory = (req, res) => {
+  const name = req.params.name;
+  const results = products.filter(p => p.category.toLowerCase() === name.toLowerCase());
+  if (results.length === 0) return res.status(404).json({ error: 'Category not found' });
+  res.json({ category: results[0].category, products: results, count: results.length });
+};
+exports.stock = (req, res) => {
+  const product = products.find(p => p.id === parseInt(req.params.id));
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+  res.json({ productId: product.id, stock: product.stock, inStock: product.stock > 0 });
+};
 exports.select  = (req, res) => {
   const product = products.find(p => p.id === parseInt(req.params.id));
   if (!product) return res.status(404).json({ error: 'Product not found' });
