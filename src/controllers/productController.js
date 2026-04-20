@@ -23,6 +23,7 @@ exports.search  = (req, res) => {
 exports.select  = (req, res) => {
   const product = products.find(p => p.id === parseInt(req.params.id));
   if (!product) return res.status(404).json({ error: 'Product not found' });
+  if (product.status === 'cancelled') return res.status(400).json({ error: 'Product is cancelled and unavailable' });
   const quantity = parseInt(req.body.quantity) || 1;
   if (quantity <= 0) return res.status(400).json({ error: 'quantity must be positive' });
   if (quantity > product.stock) return res.status(400).json({ error: 'Insufficient stock', available: product.stock });
@@ -34,4 +35,15 @@ exports.select  = (req, res) => {
     lineTotal: product.price * quantity
   };
   res.json({ message: 'Product selected', selection });
+};
+exports.cancel  = (req, res) => {
+  const product = products.find(p => p.id === parseInt(req.params.id));
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+  if (product.status === 'cancelled') return res.status(400).json({ error: 'Product already cancelled' });
+  const reason = req.body?.reason;
+  if (!reason) return res.status(400).json({ error: 'reason required' });
+  product.status = 'cancelled';
+  product.cancelledAt = new Date();
+  product.cancellationReason = reason;
+  res.json({ message: 'Product cancelled', product });
 };

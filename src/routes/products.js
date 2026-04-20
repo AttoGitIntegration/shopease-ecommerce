@@ -1,7 +1,8 @@
 const router = require('express').Router();
-const { getAll, getById, search, select } = require('../controllers/productController');
+const { getAll, getById, search, select, cancel } = require('../controllers/productController');
 router.get('/',             getAll);
 router.get('/search',       search);
 router.get('/:id',          getById);
 router.post('/:id/select',  select);
+router.put('/:id/cancel',   cancel);
 module.exports = router;
