@@ -104,3 +104,23 @@ exports.quickBuy = (req, res) => {
 };
 
 exports.getOrders = (req, res) => res.json({ orders, count: orders.length });
+
+exports.cancelOrder = (req, res) => {
+  const order = orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status === 'cancelled') return res.status(400).json({ error: 'Order already cancelled' });
+  if (order.status === 'shipped' || order.status === 'delivered') {
+    return res.status(400).json({ error: `Cannot cancel ${order.status} order` });
+  }
+  const reason = req.body?.reason;
+  if (!reason) return res.status(400).json({ error: 'reason required' });
+
+  const product = headphones.find(h => h.id === order.item.productId);
+  if (product) product.stock += order.item.quantity;
+
+  order.status = 'cancelled';
+  order.cancelledAt = new Date();
+  order.cancellationReason = reason;
+  order.refundAmount = order.payment.method === 'cod' ? 0 : order.totals.total;
+  res.json({ message: 'Headphones order cancelled', order });
+};
