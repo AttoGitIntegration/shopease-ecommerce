@@ -15,10 +15,44 @@ exports.list = (req, res) => {
   res.json({ mobiles: results, count: results.length });
 };
 
+exports.search = (req, res) => {
+  const { q, brand, minPrice, maxPrice, minRating, storage, ram, color } = req.query;
+  let results = [...mobiles];
+  if (q) {
+    const term = q.toLowerCase();
+    results = results.filter(m => m.name.toLowerCase().includes(term) || m.brand.toLowerCase().includes(term));
+  }
+  if (brand)     results = results.filter(m => m.brand.toLowerCase() === brand.toLowerCase());
+  if (minPrice)  results = results.filter(m => m.price >= parseInt(minPrice));
+  if (maxPrice)  results = results.filter(m => m.price <= parseInt(maxPrice));
+  if (minRating) results = results.filter(m => m.rating >= parseFloat(minRating));
+  if (storage)   results = results.filter(m => m.storage === storage);
+  if (ram)       results = results.filter(m => m.ram === ram);
+  if (color)     results = results.filter(m => m.color.toLowerCase() === color.toLowerCase());
+  res.json({ results, count: results.length });
+};
+
 exports.getById = (req, res) => {
   const mobile = mobiles.find(m => m.id === parseInt(req.params.id));
   if (!mobile) return res.status(404).json({ error: 'Mobile not found' });
   res.json(mobile);
+};
+
+exports.select = (req, res) => {
+  const mobile = mobiles.find(m => m.id === parseInt(req.params.id));
+  if (!mobile) return res.status(404).json({ error: 'Mobile not found' });
+  if (mobile.status === 'cancelled') return res.status(400).json({ error: 'Mobile is cancelled and unavailable' });
+  const quantity = parseInt(req.body.quantity) || 1;
+  if (quantity <= 0) return res.status(400).json({ error: 'quantity must be positive' });
+  if (quantity > mobile.stock) return res.status(400).json({ error: 'Insufficient stock', available: mobile.stock });
+  const selection = {
+    mobileId: mobile.id,
+    name: mobile.name,
+    quantity,
+    unitPrice: mobile.price,
+    total: mobile.price * quantity
+  };
+  res.json({ message: 'Mobile selected', selection });
 };
 
 exports.cancel = (req, res) => {
@@ -31,4 +65,19 @@ exports.cancel = (req, res) => {
   mobile.cancelledAt = new Date();
   mobile.cancellationReason = reason;
   res.json({ message: 'Mobile cancelled', mobile });
+};
+
+exports.reinstate = (req, res) => {
+  const mobile = mobiles.find(m => m.id === parseInt(req.params.id));
+  if (!mobile) return res.status(404).json({ error: 'Mobile not found' });
+  if (mobile.status !== 'cancelled') return res.status(400).json({ error: 'Mobile is not cancelled' });
+  delete mobile.status;
+  delete mobile.cancelledAt;
+  delete mobile.cancellationReason;
+  res.json({ message: 'Mobile reinstated', mobile });
+};
+
+exports.listCancelled = (req, res) => {
+  const results = mobiles.filter(m => m.status === 'cancelled');
+  res.json({ cancelled: results, count: results.length });
 };
