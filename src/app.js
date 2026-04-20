@@ -6,6 +6,7 @@ app.use('/api/products', require('./routes/products'));
 app.use('/api/cart',     require('./routes/cart'));
 app.use('/api/checkout', require('./routes/checkout'));
 app.use('/api/headphones', require('./routes/headphones'));
+app.use('/api/tv',       require('./routes/tv'));
 app.use('/api/orders',   require('./routes/orders'));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 module.exports = app;
