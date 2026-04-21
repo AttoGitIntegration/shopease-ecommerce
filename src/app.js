@@ -8,6 +8,7 @@ app.use('/api/checkout', require('./routes/checkout'));
 app.use('/api/headphones', require('./routes/headphones'));
 app.use('/api/tv',       require('./routes/tv'));
 app.use('/api/laptops',  require('./routes/laptops'));
+app.use('/api/booking-slots', require('./routes/bookingSlots'));
 app.use('/api/orders',   require('./routes/orders'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/admin/auth',     require('./routes/adminAuth'));
