@@ -35,3 +35,19 @@ exports.clearCart  = (req, res) => {
   cart = { items: [], total: 0 };
   res.json({ message: 'Cart cleared', cart });
 };
+exports.getCount   = (req, res) => {
+  const count = cart.items.reduce((sum, i) => sum + i.quantity, 0);
+  res.json({ count });
+};
+exports.bulkAdd    = (req, res) => {
+  const { items } = req.body;
+  if (!Array.isArray(items) || items.length === 0)
+    return res.status(400).json({ error: 'items must be a non-empty array' });
+  for (const { productId, name, price, quantity = 1 } of items) {
+    const existing = cart.items.find(i => i.productId === productId);
+    if (existing) existing.quantity += quantity;
+    else cart.items.push({ productId, name, price, quantity });
+  }
+  recalculate();
+  res.json({ message: 'Items added', cart });
+};
