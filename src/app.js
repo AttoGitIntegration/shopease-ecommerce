@@ -7,6 +7,7 @@ app.use('/api/cart',     require('./routes/cart'));
 app.use('/api/checkout', require('./routes/checkout'));
 app.use('/api/headphones', require('./routes/headphones'));
 app.use('/api/tv',       require('./routes/tv'));
+app.use('/api/laptops',  require('./routes/laptops'));
 app.use('/api/orders',   require('./routes/orders'));
 app.use('/api/payments', require('./routes/payments'));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
