@@ -12,6 +12,7 @@ app.use('/api/booking-slots', require('./routes/bookingSlots'));
 app.use('/api/orders',   require('./routes/orders'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/exchanges', require('./routes/exchanges'));
+app.use('/api/prescriptions', require('./routes/prescriptions'));
 app.use('/api/admin/auth',     require('./routes/adminAuth'));
 app.use('/api/admin/checkout', require('./routes/adminCheckout'));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
