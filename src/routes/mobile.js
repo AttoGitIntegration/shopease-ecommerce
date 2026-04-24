@@ -1,0 +1,10 @@
+const router = require('express').Router();
+const { list, search, getById, select, cancel, reinstate, listCancelled } = require('../controllers/mobileController');
+router.get('/',                list);
+router.get('/search',          search);
+router.get('/cancelled',       listCancelled);
+router.get('/:id',             getById);
+router.post('/:id/select',     select);
+router.put('/:id/cancel',      cancel);
+router.put('/:id/reinstate',   reinstate);
+module.exports = router;
