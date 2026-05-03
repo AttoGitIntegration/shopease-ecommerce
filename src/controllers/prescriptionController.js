@@ -559,3 +559,12 @@ exports._reset = () => {
   auditLog.length = 0;
   Object.keys(failedLogins).forEach(k => delete failedLogins[k]);
 };
+
+exports._findPatient = findPatient;
+exports._getPrescriptionsByPatient = (patientId) => {
+  const p = findPatient(patientId);
+  if (!p) return [];
+  return prescriptions
+    .filter(r => r.patientId === p.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+};
