@@ -35,3 +35,8 @@ exports.clearCart  = (req, res) => {
   cart = { items: [], total: 0 };
   res.json({ message: 'Cart cleared', cart });
 };
+exports.getCartCount = (req, res) => {
+  const productCount = cart.items.length;
+  const itemCount = cart.items.reduce((sum, i) => sum + i.quantity, 0);
+  res.json({ itemCount, productCount });
+};
