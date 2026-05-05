@@ -20,4 +20,22 @@ describe('Products API', () => {
     expect(res.status).toBe(200);
     expect(res.body.results.length).toBeGreaterThan(0);
   });
+  test('GET /products/search?q=shirts', async () => {
+    const res = await request(app).get('/api/products/search?q=shirts');
+    expect(res.status).toBe(200);
+    expect(res.body.results.length).toBeGreaterThan(0);
+  });
+  test('GET /products/top-rated - returns products sorted by rating', async () => {
+    const res = await request(app).get('/api/products/top-rated');
+    expect(res.status).toBe(200);
+    expect(res.body.results.length).toBeGreaterThan(0);
+    for (let i = 1; i < res.body.results.length; i++) {
+      expect(res.body.results[i - 1].rating).toBeGreaterThanOrEqual(res.body.results[i].rating);
+    }
+  });
+  test('GET /products/top-rated?min=4.5 - filters by minimum rating', async () => {
+    const res = await request(app).get('/api/products/top-rated?min=4.5');
+    expect(res.status).toBe(200);
+    res.body.results.forEach(p => expect(p.rating).toBeGreaterThanOrEqual(4.5));
+  });
 });
