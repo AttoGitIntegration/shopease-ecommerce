@@ -20,4 +20,9 @@ describe('Products API', () => {
     expect(res.status).toBe(200);
     expect(res.body.results.length).toBeGreaterThan(0);
   });
+  test('GET /products/search?q=shirts', async () => {
+    const res = await request(app).get('/api/products/search?q=shirts');
+    expect(res.status).toBe(200);
+    expect(res.body.results.length).toBeGreaterThan(0);
+  });
 });
