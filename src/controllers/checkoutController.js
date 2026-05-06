@@ -3,6 +3,11 @@ const TAX_RATE = 0.08;
 const FREE_SHIP_THRESHOLD = 2000;
 const SHIPPING_FEE = 99;
 const VALID_PAYMENT_METHODS = ['card', 'upi', 'cod', 'netbanking'];
+const COUPONS = {
+  SAVE10:  { type: 'percent', value: 10 },
+  FLAT50:  { type: 'flat',    value: 50 },
+  WELCOME: { type: 'percent', value: 15 },
+};
 let session = null;
 const orders = [];
 
@@ -32,6 +37,39 @@ exports.initiate = (req, res) => {
 exports.getSession = (req, res) => {
   if (!session) return res.status(404).json({ error: 'No active checkout session' });
   res.json(session);
+};
+
+exports.getAmount = (req, res) => {
+  const items = session ? session.items : readCart().items;
+  if (!items.length) return res.status(400).json({ error: 'No items to calculate amount for' });
+  const totals = computeTotals(items);
+  const coupon = session?.coupon || null;
+  const discount = coupon ? coupon.discount : 0;
+  res.json({
+    items: items.map(i => ({ productId: i.productId, name: i.name, price: i.price, quantity: i.quantity, lineTotal: i.price * i.quantity })),
+    subtotal: totals.subtotal,
+    tax: totals.tax,
+    shipping: totals.shipping,
+    discount,
+    total: totals.total - discount,
+    coupon,
+    source: session ? 'session' : 'cart'
+  });
+};
+
+exports.applyCoupon = (req, res) => {
+  if (!session) return res.status(404).json({ error: 'No active checkout session' });
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'code required' });
+  const rule = COUPONS[code.toUpperCase()];
+  if (!rule) return res.status(400).json({ error: 'Invalid coupon code' });
+  const base = computeTotals(session.items);
+  const discount = rule.type === 'percent'
+    ? Math.round(base.subtotal * rule.value / 100)
+    : Math.min(rule.value, base.subtotal);
+  session.coupon = { code: code.toUpperCase(), type: rule.type, value: rule.value, discount };
+  session.totals = { ...base, discount, total: base.total - discount };
+  res.json({ message: 'Coupon applied', coupon: session.coupon, totals: session.totals });
 };
 
 exports.setShipping = (req, res) => {
