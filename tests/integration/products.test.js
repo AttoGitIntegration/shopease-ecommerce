@@ -38,4 +38,24 @@ describe('Products API', () => {
     expect(res.status).toBe(200);
     res.body.results.forEach(p => expect(p.rating).toBeGreaterThanOrEqual(4.5));
   });
+  test('GET /products/price-range - returns min and max price across all products', async () => {
+    const res = await request(app).get('/api/products/price-range');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('minPrice');
+    expect(res.body).toHaveProperty('maxPrice');
+    expect(res.body.minPrice).toBeLessThanOrEqual(res.body.maxPrice);
+    expect(res.body.category).toBe('all');
+  });
+  test('GET /products/price-range?category=Electronics - scopes range to category', async () => {
+    const res = await request(app).get('/api/products/price-range?category=Electronics');
+    expect(res.status).toBe(200);
+    expect(res.body.category).toBe('Electronics');
+    expect(res.body.minPrice).toBe(2999);
+    expect(res.body.maxPrice).toBe(2999);
+  });
+  test('GET /products/price-range?category=unknown - returns 404 for missing category', async () => {
+    const res = await request(app).get('/api/products/price-range?category=unknown');
+    expect(res.status).toBe(404);
+    expect(res.body).toHaveProperty('error');
+  });
 });
