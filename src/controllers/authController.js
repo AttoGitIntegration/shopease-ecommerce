@@ -21,3 +21,6 @@ exports.logout = (req, res) => {
   activeTokens.delete(req.token);
   res.json({ message: 'Logged out successfully' });
 };
+exports.validate = (req, res) => {
+  res.json({ valid: true, token: req.token });
+};
