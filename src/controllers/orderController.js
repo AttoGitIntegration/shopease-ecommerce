@@ -1,5 +1,6 @@
 const orders = [];
 const OTP_EXPIRY_MINUTES = 30;
+const PICKUP_OTP_EXPIRY_HOURS = 48;
 
 function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -25,6 +26,11 @@ exports.cancelOrder  = (req, res) => {
   if (order.status === 'cancelled') return res.status(400).json({ error: 'Order already cancelled' });
   if (order.status === 'shipped' || order.status === 'delivered') {
     return res.status(400).json({ error: `Cannot cancel ${order.status} order` });
+  }
+  const CANCEL_WINDOW_HOURS = 24;
+  const hoursSince = (Date.now() - new Date(order.createdAt).getTime()) / (1000 * 60 * 60);
+  if (hoursSince > CANCEL_WINDOW_HOURS) {
+    return res.status(400).json({ error: `Cancellation window of ${CANCEL_WINDOW_HOURS} hours has expired` });
   }
   order.status = 'cancelled';
   order.cancelledAt = new Date();
@@ -71,10 +77,19 @@ exports.approveReturn = (req, res) => {
   if (order.status !== 'returned') {
     return res.status(400).json({ error: `Cannot approve return for ${order.status} order` });
   }
+  const pickupOtp = generateOtp();
   order.status = 'return_approved';
   order.returnApprovedAt = new Date();
   order.returnApprovalNote = req.body?.note || null;
-  res.json({ message: 'Return request approved', order });
+  order.pickupOtp = pickupOtp;
+  order.pickupOtpExpiresAt = new Date(Date.now() + PICKUP_OTP_EXPIRY_HOURS * 60 * 60 * 1000);
+  order.pickupOtpVerified = false;
+  res.json({
+    message: 'Return request approved, pickup OTP generated for collection',
+    order,
+    pickupOtp,
+    pickupOtpExpiresAt: order.pickupOtpExpiresAt
+  });
 };
 exports.issueRefund = (req, res) => {
   const order = orders.find(o => o.id === parseInt(req.params.id));
@@ -88,7 +103,76 @@ exports.issueRefund = (req, res) => {
   order.refundAmount = order.total;
   order.refundMethod = method;
   order.refundTransactionId = `RFND-${Date.now()}-${order.id}`;
+  order.pickupOtp = null;
+  order.pickupOtpExpiresAt = null;
   res.json({ message: 'Refund issued', order });
+};
+
+exports.regeneratePickupOtp = (req, res) => {
+  const order = orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status !== 'return_approved') {
+    return res.status(400).json({ error: `Can only regenerate pickup OTP for return_approved orders, current status: ${order.status}` });
+  }
+  const otp = generateOtp();
+  order.pickupOtp = otp;
+  order.pickupOtpExpiresAt = new Date(Date.now() + PICKUP_OTP_EXPIRY_HOURS * 60 * 60 * 1000);
+  res.json({
+    message: 'New pickup OTP generated',
+    orderId: order.id,
+    pickupOtp: otp,
+    pickupOtpExpiresAt: order.pickupOtpExpiresAt
+  });
+};
+
+exports.collectReturn = (req, res) => {
+  const order = orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status !== 'return_approved') {
+    return res.status(400).json({ error: `Cannot collect return for ${order.status} order` });
+  }
+  const { otp, condition, conditionNotes, refundMethod } = req.body;
+  if (!otp) return res.status(400).json({ error: 'otp required' });
+  if (!condition) return res.status(400).json({ error: 'condition required' });
+  if (!['good', 'damaged'].includes(condition)) {
+    return res.status(400).json({ error: 'condition must be "good" or "damaged"' });
+  }
+  if (new Date() > new Date(order.pickupOtpExpiresAt)) {
+    return res.status(400).json({ error: 'Pickup OTP has expired, please request a new one' });
+  }
+  if (otp !== order.pickupOtp) {
+    return res.status(400).json({ error: 'Invalid pickup OTP' });
+  }
+
+  order.pickupOtpVerified = true;
+  order.pickupOtp = null;
+  order.pickupOtpExpiresAt = null;
+  order.collectedAt = new Date();
+  order.productCondition = condition;
+  order.productConditionNotes = conditionNotes || null;
+
+  if (condition === 'good') {
+    order.status = 'refunded';
+    order.refundedAt = new Date();
+    order.refundAmount = order.total;
+    order.refundMethod = refundMethod || 'original_payment';
+    order.refundTransactionId = `RFND-${Date.now()}-${order.id}`;
+    return res.json({
+      message: 'Return collected. Product in good condition. Refund issued to customer account.',
+      order,
+      refundAmount: order.refundAmount,
+      refundTransactionId: order.refundTransactionId
+    });
+  } else {
+    order.status = 'return_rejected';
+    order.returnRejectedAt = new Date();
+    order.returnRejectionReason = `Product received in damaged condition${conditionNotes ? ': ' + conditionNotes : ''}`;
+    order.refundAmount = 0;
+    return res.json({
+      message: 'Return collected but product is damaged. Refund rejected.',
+      order
+    });
+  }
 };
 exports.getReturnStatus = (req, res) => {
   const order = orders.find(o => o.id === parseInt(req.params.id));
@@ -103,6 +187,10 @@ exports.getReturnStatus = (req, res) => {
     returnReason: order.returnReason || null,
     requestedAt: order.returnedAt || null,
     approvedAt: order.returnApprovedAt || null,
+    pickupOtpExpiresAt: order.pickupOtpExpiresAt || null,
+    collectedAt: order.collectedAt || null,
+    productCondition: order.productCondition || null,
+    productConditionNotes: order.productConditionNotes || null,
     rejectedAt: order.returnRejectedAt || null,
     rejectionReason: order.returnRejectionReason || null,
     refundedAt: order.refundedAt || null,
