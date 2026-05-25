@@ -1,7 +1,8 @@
 const router = require('express').Router();
-const { getAll, getById, search, select, cancel, categories, byCategory, stock, topRated, priceRange } = require('../controllers/productController');
+const { getAll, getById, search, imageSearch, select, cancel, categories, byCategory, stock, topRated, priceRange } = require('../controllers/productController');
 router.get('/',               getAll);
 router.get('/search',         search);
+router.post('/search/image',  imageSearch);
 router.get('/categories',     categories);
 router.get('/top-rated',      topRated);
 router.get('/price-range',    priceRange);

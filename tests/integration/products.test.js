@@ -25,6 +25,41 @@ describe('Products API', () => {
     expect(res.status).toBe(200);
     expect(res.body.results.length).toBeGreaterThan(0);
   });
+  test('GET /products/search?q=clothing - matches by category keyword', async () => {
+    const res = await request(app).get('/api/products/search?q=clothing');
+    expect(res.status).toBe(200);
+    expect(res.body.results.length).toBeGreaterThan(0);
+    res.body.results.forEach(p => expect(p.category).toBe('Clothing'));
+  });
+  test('GET /products/search?q=cotton - matches by description keyword', async () => {
+    const res = await request(app).get('/api/products/search?q=cotton');
+    expect(res.status).toBe(200);
+    expect(res.body.results.length).toBeGreaterThan(0);
+  });
+  test('GET /products/search?q=nonexistent - returns empty results', async () => {
+    const res = await request(app).get('/api/products/search?q=nonexistent');
+    expect(res.status).toBe(200);
+    expect(res.body.results.length).toBe(0);
+    expect(res.body.count).toBe(0);
+  });
+  test('GET /products/search?category=Footwear - filters by category', async () => {
+    const res = await request(app).get('/api/products/search?category=Footwear');
+    expect(res.status).toBe(200);
+    res.body.results.forEach(p => expect(p.category).toBe('Footwear'));
+  });
+  test('GET /products/search?minPrice=1000&maxPrice=2000 - filters by price range', async () => {
+    const res = await request(app).get('/api/products/search?minPrice=1000&maxPrice=2000');
+    expect(res.status).toBe(200);
+    res.body.results.forEach(p => {
+      expect(p.price).toBeGreaterThanOrEqual(1000);
+      expect(p.price).toBeLessThanOrEqual(2000);
+    });
+  });
+  test('GET /products/search - no params returns 400', async () => {
+    const res = await request(app).get('/api/products/search');
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('error');
+  });
   test('GET /products/top-rated - returns products sorted by rating', async () => {
     const res = await request(app).get('/api/products/top-rated');
     expect(res.status).toBe(200);
@@ -57,5 +92,55 @@ describe('Products API', () => {
     const res = await request(app).get('/api/products/price-range?category=unknown');
     expect(res.status).toBe(404);
     expect(res.body).toHaveProperty('error');
+  });
+
+  // Image search
+  test('POST /products/search/image - matches products from image URL filename', async () => {
+    const res = await request(app)
+      .post('/api/products/search/image')
+      .send({ imageUrl: 'https://example.com/products/running-shoes.jpg' });
+    expect(res.status).toBe(200);
+    expect(res.body.searchMethod).toBe('image');
+    expect(res.body).toHaveProperty('detectedLabels');
+    expect(res.body.detectedLabels).toEqual(expect.arrayContaining(['running', 'shoes']));
+    expect(res.body.results.length).toBeGreaterThan(0);
+    expect(res.body.results[0].category).toBe('Footwear');
+  });
+
+  test('POST /products/search/image - returns top-rated suggestions when no label matches', async () => {
+    const res = await request(app)
+      .post('/api/products/search/image')
+      .send({ imageUrl: 'https://example.com/uploads/xyz-unknown-object.png' });
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('note');
+    expect(res.body.results.length).toBe(3);
+    for (let i = 1; i < res.body.results.length; i++) {
+      expect(res.body.results[i - 1].rating).toBeGreaterThanOrEqual(res.body.results[i].rating);
+    }
+  });
+
+  test('POST /products/search/image - missing imageUrl returns 400', async () => {
+    const res = await request(app)
+      .post('/api/products/search/image')
+      .send({});
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('error');
+  });
+
+  test('POST /products/search/image - invalid URL returns 400', async () => {
+    const res = await request(app)
+      .post('/api/products/search/image')
+      .send({ imageUrl: 'not-a-valid-url' });
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('error');
+  });
+
+  test('POST /products/search/image - matches headphones from image URL', async () => {
+    const res = await request(app)
+      .post('/api/products/search/image')
+      .send({ imageUrl: 'https://cdn.store.com/images/wireless-headphones-product.jpg' });
+    expect(res.status).toBe(200);
+    expect(res.body.results.some(p => p.name.toLowerCase().includes('headphone'))).toBe(true);
+    expect(res.body).toHaveProperty('imageUrl');
   });
 });
