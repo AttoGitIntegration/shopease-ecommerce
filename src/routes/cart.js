@@ -1,6 +1,7 @@
 const router = require('express').Router();
-const { getCart, getItem, addItem, updateItem, removeItem, clearCart } = require('../controllers/cartController');
+const { getCart, getItem, addItem, updateItem, removeItem, clearCart, getCount } = require('../controllers/cartController');
 router.get('/',          getCart);
+router.get('/count',     getCount);
 router.get('/item/:productId', getItem);
 router.post('/add',      addItem);
 router.put('/update',    updateItem);

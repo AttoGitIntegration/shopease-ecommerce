@@ -3,6 +3,7 @@ const recalculate = () => { cart.total = cart.items.reduce((sum, i) => sum + i.p
 exports.readCart   = () => cart;
 exports.resetCart  = () => { cart = { items: [], total: 0 }; };
 exports.getCart    = (req, res) => res.json(cart);
+exports.getCount   = (req, res) => res.json({ count: cart.items.reduce((sum, i) => sum + i.quantity, 0) });
 exports.addItem    = (req, res) => {
   const { productId, name, price, quantity = 1 } = req.body;
   const existing = cart.items.find(i => i.productId === productId);
