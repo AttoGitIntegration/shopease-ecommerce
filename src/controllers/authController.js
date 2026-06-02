@@ -63,6 +63,47 @@ function revokeSession(token) {
   sessions.delete(token);
 }
 
+/** Resolve the userId a token belongs to, whether it is a managed session
+ *  token or a legacy `fake-jwt-{userId}-{timestamp}` password-login token. */
+function tokenUserId(token) {
+  const session = sessions.get(token);
+  if (session) return session.userId;
+  if (token.startsWith('fake-jwt-')) {
+    const id = parseInt(token.split('-')[2], 10);
+    return Number.isInteger(id) ? id : null;
+  }
+  return null;
+}
+
+/**
+ * Revoke every active token belonging to a user, immediately invalidating all
+ * of their logins (password and managed/SSO sessions alike). Returns the number
+ * of tokens revoked.
+ */
+function revokeUserSessions(userId) {
+  let revoked = 0;
+  for (const token of [...activeTokens]) {
+    if (tokenUserId(token) === userId) {
+      revokeSession(token);
+      revoked += 1;
+    }
+  }
+  return revoked;
+}
+
+/**
+ * Revoke all logins for the user account linked to an email address (the link
+ * between an employee record and an auth account). Returns the number of tokens
+ * revoked; 0 if no account matches the email.
+ */
+function revokeLoginByEmail(email) {
+  if (!email) return 0;
+  const normalized = String(email).toLowerCase();
+  const user = users.find(u => u.email && u.email.toLowerCase() === normalized);
+  if (!user) return 0;
+  return revokeUserSessions(user.id);
+}
+
 /**
  * Find an existing user by federated identity (provider + subject) or by email,
  * otherwise provision a new federated user. Returns { user, created }.
@@ -100,4 +141,6 @@ function upsertFederatedUser({ provider, sub, email, name }) {
 
 exports.createSession = createSession;
 exports.revokeSession = revokeSession;
+exports.revokeUserSessions = revokeUserSessions;
+exports.revokeLoginByEmail = revokeLoginByEmail;
 exports.upsertFederatedUser = upsertFederatedUser;
