@@ -1,0 +1,90 @@
+[
+  {
+    "id": "MED001",
+    "name": "Paracetamol 500mg",
+    "category": "Pain Relief",
+    "manufacturer": "Cipla",
+    "price": 25.50,
+    "stock": 250,
+    "prescriptionRequired": false,
+    "description": "Used to treat mild to moderate pain and reduce fever.",
+    "image": "https://via.placeholder.com/200x200?text=Paracetamol"
+  },
+  {
+    "id": "MED002",
+    "name": "Amoxicillin 250mg",
+    "category": "Antibiotic",
+    "manufacturer": "Sun Pharma",
+    "price": 95.00,
+    "stock": 80,
+    "prescriptionRequired": true,
+    "description": "Broad-spectrum antibiotic for bacterial infections.",
+    "image": "https://via.placeholder.com/200x200?text=Amoxicillin"
+  },
+  {
+    "id": "MED003",
+    "name": "Cetirizine 10mg",
+    "category": "Antihistamine",
+    "manufacturer": "Dr Reddy's",
+    "price": 35.00,
+    "stock": 180,
+    "prescriptionRequired": false,
+    "description": "Relieves symptoms of allergic rhinitis and chronic urticaria.",
+    "image": "https://via.placeholder.com/200x200?text=Cetirizine"
+  },
+  {
+    "id": "MED004",
+    "name": "Metformin 500mg",
+    "category": "Diabetes",
+    "manufacturer": "USV",
+    "price": 60.00,
+    "stock": 140,
+    "prescriptionRequired": true,
+    "description": "Oral antidiabetic medication for type 2 diabetes.",
+    "image": "https://via.placeholder.com/200x200?text=Metformin"
+  },
+  {
+    "id": "MED005",
+    "name": "Vitamin D3 60K",
+    "category": "Supplement",
+    "manufacturer": "Mankind",
+    "price": 120.00,
+    "stock": 300,
+    "prescriptionRequired": false,
+    "description": "Weekly Vitamin D3 supplement to treat deficiency.",
+    "image": "https://via.placeholder.com/200x200?text=Vitamin+D3"
+  },
+  {
+    "id": "MED006",
+    "name": "Omeprazole 20mg",
+    "category": "Antacid",
+    "manufacturer": "Lupin",
+    "price": 78.50,
+    "stock": 110,
+    "prescriptionRequired": false,
+    "description": "Reduces stomach acid for treatment of GERD and ulcers.",
+    "image": "https://via.placeholder.com/200x200?text=Omeprazole"
+  },
+  {
+    "id": "MED007",
+    "name": "Atorvastatin 10mg",
+    "category": "Cardiac",
+    "manufacturer": "Pfizer",
+    "price": 145.00,
+    "stock": 90,
+    "prescriptionRequired": true,
+    "description": "Lowers cholesterol and reduces risk of heart disease.",
+    "image": "https://via.placeholder.com/200x200?text=Atorvastatin"
+  },
+  {
+    "id": "MED008",
+    "name": "ORS Sachet",
+    "category": "Hydration",
+    "manufacturer": "FDC",
+    "price": 18.00,
+    "stock": 500,
+    "prescriptionRequired": false,
+    "description": "Oral rehydration salts for dehydration and diarrhea.",
+    "image": "https://via.placeholder.com/200x200?text=ORS"
+  }
+]

@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Bookface — Social Prototype</title>
+
+  <!-- ============================================================
+       DEPENDENCIES (all via CDN — no build step required)
+       - Tailwind Play CDN for styling + dark mode
+       - React 18 (UMD) + ReactDOM
+       - Babel Standalone so we can write JSX directly in the browser
+       ============================================================ -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Tailwind config must be set BEFORE first render.
+    // darkMode:'class' lets us toggle dark mode by adding/removing the
+    // `dark` class on <html>.
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: '#1877F2',        // Facebook-ish blue
+            brandDark: '#0b5fcc',
+          },
+          fontFamily: {
+            sans: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Constrain the whole app to a phone-sized frame on larger screens so it
+       reads as a "mobile app". On real phones it just fills the viewport. */
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: #e4e6eb;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .dark body { background: #18191a; }
+
+    /* Hide scrollbars but keep scrolling for that native-app feel */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Tiny entrance animation for newly added items */
+    @keyframes pop { from { transform: scale(.96); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+    .animate-pop { animation: pop .18s ease-out }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- ================================================================
+       APP CODE — written in JSX, transpiled in-browser by Babel.
+       Organized top-to-bottom as:
+         1. Mock data + helpers
+         2. Global state (reducer + context)
+         3. Reusable UI primitives (Avatar, Modal, Icon, ...)
+         4. Screens (Auth, Feed, Friends, Notifications, Profile, Search)
+         5. Shell (TopBar, BottomNav) + Root App
+       ================================================================ -->
+  <script type="text/babel" data-presets="react">
+    const { useState, useReducer, useContext, createContext, useRef, useEffect, useMemo } = React;
+
+    /* ============================================================
+       1. HELPERS
+       ============================================================ */
+
+    // Deterministic color from a string (used for avatar/cover backgrounds)
+    const COLORS = ['#1877F2','#E4405F','#42B72A','#F7B928','#8E44AD','#16A085','#E67E22','#2C3E50','#D63384','#0DCAF0'];
+    const colorFor = (seed = '') => {
+      let h = 0;
+      for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+      return COLORS[h % COLORS.length];
+    };
+
+    const initials = (name = '') =>
+      name.trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
+
+    // Human-friendly relative time, e.g. "5m", "3h", "2d"
+    const timeAgo = (ts) => {
+      const s = Math.max(1, Math.floor((Date.now() - ts) / 1000));
+      if (s < 60) return s + 's';
+      const m = Math.floor(s / 60); if (m < 60) return m + 'm';
+      const h = Math.floor(m / 60); if (h < 24) return h + 'h';
+      const d = Math.floor(h / 24); if (d < 7) return d + 'd';
+      const w = Math.floor(d / 7); return w + 'w';
+    };
+
+    // Simple unique id generator (in-memory only)
+    let _id = 1000;
+    const uid = () => String(++_id);
+
+    // Reaction definitions (Facebook-style)
+    const REACTIONS = [
+      { key: 'like',  emoji: '👍', label: 'Like',  color: '#1877F2' },
+      { key: 'love',  emoji: '❤️', label: 'Love',  color: '#E4405F' },
+      { key: 'haha',  emoji: '😆', label: 'Haha',  color: '#F7B928' },
+      { key: 'wow',   emoji: '😮', label: 'Wow',   color: '#F7B928' },
+      { key: 'sad',   emoji: '😢', label: 'Sad',   color: '#F7B928' },
+      { key: 'angry', emoji: '😡', label: 'Angry', color: '#E67E22' },
+    ];
+    const reactionByKey = (k) => REACTIONS.find(r => r.key === k);
+
+    /* ============================================================
+       2. MOCK DATA  (everything lives in memory — no backend)
+       ============================================================ */
+
+    const now = Date.now();
+    const mins = (n) => now - n * 60 * 1000;
+
+    const SEED_USERS = [
+      { id: 'u1', name: 'You',            email: 'you@demo.com',  password: 'password1', bio: 'Just exploring this prototype 🚀', friends: ['u2','u3','u4'] },
+      { id: 'u2', name: 'Aisha Khan',     email: 'aisha@demo.com',password: 'password1', bio: 'Designer & coffee enthusiast ☕',  friends: ['u1','u3','u5'] },
+      { id: 'u3', name: 'Marcus Lee',     email: 'marcus@demo.com',password:'password1', bio: 'Runner. Foodie. Dog dad 🐕',       friends: ['u1','u2'] },
+      { id: 'u4', name: 'Sofia Rossi',    email: 'sofia@demo.com',password: 'password1', bio: 'Travel ✈️ | 23 countries and counting', friends: ['u1','u6'] },
+      { id: 'u5', name: 'David Chen',     email: 'david@demo.com',password: 'password1', bio: 'Building things with code 💻',      friends: ['u2','u6'] },
+      { id: 'u6', name: 'Priya Nair',     email: 'priya@demo.com',password: 'password1', bio: 'Photographer 📷 | nature lover',    friends: ['u4','u5'] },
+    ];
+
+    // Post images are CSS gradients so the app is 100% offline/self-contained.
+    const GRADIENTS = [
+      'linear-gradient(135deg,#667eea,#764ba2)',
+      'linear-gradient(135deg,#f093fb,#f5576c)',
+      'linear-gradient(135deg,#4facfe,#00f2fe)',
+      'linear-gradient(135deg,#43e97b,#38f9d7)',
+      'linear-gradient(135deg,#fa709a,#fee140)',
+      'linear-gradient(135deg,#30cfd0,#330867)',
+    ];
+
+    const SEED_POSTS = [
+      { id: 'p1', authorId: 'u2', text: 'Finished redesigning our app today. So happy with how the dark mode turned out! 🌙', image: GRADIENTS[0], imageCaption: 'New design system', timestamp: mins(12), reactions: { u3: 'love', u4: 'like', u5: 'like' }, comments: [ { id: uid(), authorId: 'u3', text: 'Looks amazing! 🔥', timestamp: mins(8) } ], shares: 2 },
+      { id: 'p2', authorId: 'u4', text: 'Sunrise over the mountains this morning. Worth the 4am wake-up call. 🏔️', image: GRADIENTS[2], imageCaption: 'Dolomites, Italy', timestamp: mins(48), reactions: { u1: 'wow', u6: 'love' }, comments: [], shares: 5 },
+      { id: 'p3', authorId: 'u3', text: 'Hot take: pineapple absolutely belongs on pizza. Fight me in the comments. 🍍🍕', image: null, timestamp: mins(120), reactions: { u2: 'haha', u5: 'haha', u1: 'like' }, comments: [ { id: uid(), authorId: 'u5', text: 'This is a crime 😅', timestamp: mins(90) }, { id: uid(), authorId: 'u2', text: 'Agreed! Team pineapple 🙌', timestamp: mins(60) } ], shares: 0 },
+      { id: 'p4', authorId: 'u5', text: 'Shipped a new feature to production with zero bugs. (Narrator: there were bugs.)', image: null, timestamp: mins(240), reactions: { u3: 'haha', u2: 'like' }, comments: [], shares: 1 },
+      { id: 'p5', authorId: 'u6', text: 'Spent the weekend shooting wildlife. Here is my favorite frame. 🦌', image: GRADIENTS[3], imageCaption: 'Golden hour', timestamp: mins(600), reactions: { u4: 'love', u1: 'love', u5: 'wow' }, comments: [], shares: 3 },
+    ];
+
+    const SEED_FRIEND_REQUESTS = [
+      // people who want to be YOUR (u1) friend
+      { id: uid(), fromId: 'u5', toId: 'u1', status: 'pending', timestamp: mins(30) },
+      { id: uid(), fromId: 'u6', toId: 'u1', status: 'pending', timestamp: mins(180) },
+    ];
+
+    const SEED_NOTIFICATIONS = [
+      { id: uid(), type: 'reaction', fromId: 'u2', postId: 'p1', read: false, timestamp: mins(10) },
+      { id: uid(), type: 'comment',  fromId: 'u3', postId: 'p3', read: false, timestamp: mins(60) },
+      { id: uid(), type: 'friend_request', fromId: 'u5', read: false, timestamp: mins(30) },
+    ];
+
+    /* ============================================================
+       3. GLOBAL STATE — reducer + context
+       ============================================================ */
+
+    const initialState = {
+      currentUserId: null,                 // null = logged out
+      users: SEED_USERS,
+      posts: SEED_POSTS,
+      friendRequests: SEED_FRIEND_REQUESTS,
+      notifications: SEED_NOTIFICATIONS,
+      theme: 'light',
+    };
+
+    function reducer(state, action) {
+      switch (action.type) {
+        case 'LOGIN':
+          return { ...state, currentUserId: action.userId };
+
+        case 'SIGNUP': {
+          const newUser = {
+            id: uid(), name: action.name, email: action.email,
+            password: action.password, bio: 'New here 👋', friends: [],
+          };
+          return { ...state, users: [...state.users, newUser], currentUserId: newUser.id };
+        }
+
+        case 'LOGOUT':
+          return { ...state, currentUserId: null };
+
+        case 'TOGGLE_THEME':
+          return { ...state, theme: state.theme === 'light' ? 'dark' : 'light' };
+
+        case 'ADD_POST': {
+          const post = {
+            id: uid(), authorId: state.currentUserId, text: action.text,
+            image: action.image || null, imageCaption: action.imageCaption || null,
+            timestamp: Date.now(), reactions: {}, comments: [], shares: 0,
+          };
+          return { ...state, posts: [post, ...state.posts] };
+        }
+
+        case 'REACT': {
+          // Toggle a reaction by the current user on a post.
+          const me = state.currentUserId;
+          const posts = state.posts.map(p => {
+            if (p.id !== action.postId) return p;
+            const reactions = { ...p.reactions };
+            if (reactions[me] === action.reaction) delete reactions[me]; // same reaction -> remove
+            else reactions[me] = action.reaction;                        // set/replace
+            return { ...p, reactions };
+          });
+          return { ...state, posts };
+        }
+
+        case 'ADD_COMMENT': {
+          const posts = state.posts.map(p =>
+            p.id === action.postId
+              ? { ...p, comments: [...p.comments, { id: uid(), authorId: state.currentUserId, text: action.text, timestamp: Date.now() }] }
+              : p
+          );
+          return { ...state, posts };
+        }
+
+        case 'SHARE': {
+          const posts = state.posts.map(p =>
+            p.id === action.postId ? { ...p, shares: p.shares + 1 } : p
+          );
+          return { ...state, posts };
+        }
+
+        case 'SEND_FRIEND_REQUEST': {
+          const req = { id: uid(), fromId: state.currentUserId, toId: action.userId, status: 'pending', timestamp: Date.now() };
+          return { ...state, friendRequests: [...state.friendRequests, req] };
+        }
+
+        case 'RESPOND_FRIEND_REQUEST': {
+          const req = state.friendRequests.find(r => r.id === action.requestId);
+          if (!req) return state;
+          const friendRequests = state.friendRequests.map(r =>
+            r.id === action.requestId ? { ...r, status: action.accept ? 'accepted' : 'declined' } : r
+          );
+          let users = state.users;
+          if (action.accept) {
+            // Add each other to friends lists
+            users = state.users.map(u => {
+              if (u.id === req.fromId) return { ...u, friends: [...new Set([...u.friends, req.toId])] };
+              if (u.id === req.toId)   return { ...u, friends: [...new Set([...u.friends, req.fromId])] };
+              return u;
+            });
+          }
+          return { ...state, friendRequests, users };
+        }
+
+        case 'MARK_NOTIFS_READ':
+          return { ...state, notifications: state.notifications.map(n => ({ ...n, read: true })) };
+
+        default:
+          return state;
+      }
+    }
+
+    const AppContext = createContext(null);
+    const useApp = () => useContext(AppContext);
+
+    // Convenience selectors used across components
+    const useUser = (id) => { const { state } = useApp(); return state.users.find(u => u.id === id); };
+
+    /* ============================================================
+       4. UI PRIMITIVES
+       ============================================================ */
+
+    // Circular avatar with colored initials (no external images needed)
+    function Avatar({ user, size = 40, ring = false }) {
+      const bg = colorFor(user?.name || user?.id || '?');
+      return (
+        <div
+          className={'shrink-0 rounded-full flex items-center justify-center font-semibold text-white select-none ' + (ring ? 'ring-2 ring-white dark:ring-gray-800' : '')}
+          style={{ width: size, height: size, background: bg, fontSize: size * 0.4 }}
+        >
+          {initials(user?.name || '?')}
+        </div>
+      );
+    }
+
+    // Generic icon set (inline SVG, stroke-based, currentColor)
+    function Icon({ name, size = 24, fill = false }) {
+      const s = { width: size, height: size };
+      const common = { fill: fill ? 'currentColor' : 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', viewBox: '0 0 24 24', style: s };
+      const paths = {
+        home:    <path d="M3 11.5 12 4l9 7.5M5 10v10h5v-6h4v6h5V10" />,
+        like:    <path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Zm0 0 4-7a2 2 0 0 1 2.6 2.6L12.5 9h5.5a2 2 0 0 1 2 2.4l-1.3 6A2 2 0 0 1 16.7 19H7" />,
+        users:   <g><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 5.2A3.5 3.5 0 0 1 16 12M21 20c0-2.5-1.5-4.3-4-4.8"/></g>,
+        bell:    <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />,
+        search:  <g><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></g>,
+        comment: <path d="M21 11.5a8.4 8.4 0 0 1-12 7.6L3 21l1.9-6A8.4 8.4 0 1 1 21 11.5Z" />,
+        share:   <g><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></g>,
+        plus:    <path d="M12 5v14M5 12h14" />,
+        image:   <g><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></g>,
+        x:       <path d="M6 6l12 12M18 6 6 18" />,
+        moon:    <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z" />,
+        sun:     <g><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/></g>,
+        back:    <path d="M15 18l-6-6 6-6" />,
+        check:   <path d="M20 6 9 17l-5-5" />,
+        logout:  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />,
+        camera:  <g><path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L17 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.5"/></g>,
+        userPlus:<g><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5M18 9v6M21 12h-6"/></g>,
+      };
+      return <svg {...common}>{paths[name]}</svg>;
+    }
+
+    // Pressable button with subtle scale feedback
+    function Tap({ as = 'button', className = '', children, ...props }) {
+      const Comp = as;
+      return (
+        <Comp className={'active:scale-95 transition-transform select-none ' + className} {...props}>
+          {children}
+        </Comp>
+      );
+    }
+
+    // Bottom-sheet / centered modal
+    function Modal({ open, onClose, children, title }) {
+      if (!open) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+          <div className="relative w-full sm:max-w-md bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl shadow-xl animate-pop max-h-[90%] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+              <Tap onClick={onClose} className="p-1 text-gray-500 dark:text-gray-400"><Icon name="x" size={22} /></Tap>
+            </div>
+            <div className="overflow-y-auto no-scrollbar p-4">{children}</div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ============================================================
+       4b. AUTH SCREEN  (Login / Signup with validation)
+       ============================================================ */
+
+    // Defined at module scope (NOT inside AuthScreen) so its identity is stable
+    // across renders — otherwise React remounts the <input> on every keystroke
+    // and the field loses focus after each character.
+    function AuthField({ value, onChange, error, type = 'text', placeholder }) {
+      return (
+        <div>
+          <input
+            type={type} value={value} onChange={onChange} placeholder={placeholder}
+            className={'w-full px-4 py-3 rounded-xl border bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-brand ' +
+              (error ? 'border-red-500' : 'border-gray-200 dark:border-gray-600')}
+          />
+          {error && <p className="text-red-500 text-sm mt-1 ml-1">{error}</p>}
+        </div>
+      );
+    }
+
+    function AuthScreen() {
+      const { state, dispatch } = useApp();
+      const [mode, setMode] = useState('login');          // 'login' | 'signup'
+      const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
+      const [errors, setErrors] = useState({});
+      const [serverError, setServerError] = useState('');
+
+      const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+      // Field-level validation
+      const validate = () => {
+        const e = {};
+        if (mode === 'signup' && !form.name.trim()) e.name = 'Please enter your name';
+        if (!form.email.trim()) e.email = 'Email is required';
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Enter a valid email address';
+        if (!form.password) e.password = 'Password is required';
+        else if (form.password.length < 6) e.password = 'Password must be at least 6 characters';
+        if (mode === 'signup' && form.password !== form.confirm) e.confirm = 'Passwords do not match';
+        setErrors(e);
+        return Object.keys(e).length === 0;
+      };
+
+      const submit = (ev) => {
+        ev.preventDefault();
+        setServerError('');
+        if (!validate()) return;
+        if (mode === 'login') {
+          const user = state.users.find(u => u.email.toLowerCase() === form.email.toLowerCase());
+          if (!user || user.password !== form.password) { setServerError('Invalid email or password'); return; }
+          dispatch({ type: 'LOGIN', userId: user.id });
+        } else {
+          if (state.users.some(u => u.email.toLowerCase() === form.email.toLowerCase())) {
+            setServerError('An account with this email already exists'); return;
+          }
+          dispatch({ type: 'SIGNUP', name: form.name.trim(), email: form.email.trim(), password: form.password });
+        }
+      };
+
+      return (
+        <div className="min-h-full flex flex-col justify-center px-6 py-10 bg-white dark:bg-gray-900">
+          <div className="text-center mb-8">
+            <div className="text-5xl font-extrabold text-brand">bookface</div>
+            <p className="text-gray-500 dark:text-gray-400 mt-2">Connect with friends and the world.</p>
+          </div>
+
+          <form onSubmit={submit} className="space-y-3 max-w-sm w-full mx-auto">
+            {mode === 'signup' && <AuthField value={form.name}     onChange={set('name')}     error={errors.name}     placeholder="Full name" />}
+            <AuthField value={form.email}    onChange={set('email')}    error={errors.email}    type="email"    placeholder="Email address" />
+            <AuthField value={form.password} onChange={set('password')} error={errors.password} type="password" placeholder="Password" />
+            {mode === 'signup' && <AuthField value={form.confirm} onChange={set('confirm')} error={errors.confirm} type="password" placeholder="Confirm password" />}
+
+            {serverError && <p className="text-red-500 text-sm text-center">{serverError}</p>}
+
+            <Tap as="button" type="submit"
+              className="w-full bg-brand hover:bg-brandDark text-white font-semibold py-3 rounded-xl text-lg">
+              {mode === 'login' ? 'Log In' : 'Create Account'}
+            </Tap>
+          </form>
+
+          <div className="text-center mt-6 text-gray-600 dark:text-gray-400">
+            {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+            <button
+              onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setErrors({}); setServerError(''); }}
+              className="text-brand font-semibold">
+              {mode === 'login' ? 'Sign Up' : 'Log In'}
+            </button>
+          </div>
+
+          {mode === 'login' && (
+            <div className="text-center mt-6 text-xs text-gray-400 dark:text-gray-500">
+              Demo login: <b>you@demo.com</b> / <b>password1</b>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    /* ============================================================
+       4c. POST CARD  (reactions popover + comments)
+       ============================================================ */
+
+    function ReactionSummary({ post }) {
+      const counts = Object.values(post.reactions);
+      if (counts.length === 0) return <span className="text-gray-400">Be the first to react</span>;
+      // Show up to 3 distinct emojis + total count
+      const distinct = [...new Set(counts)].slice(0, 3).map(k => reactionByKey(k)?.emoji);
+      return (
+        <span className="flex items-center gap-1">
+          <span className="flex -space-x-1">{distinct.map((e, i) => <span key={i}>{e}</span>)}</span>
+          <span>{counts.length}</span>
+        </span>
+      );
+    }
+
+    function CommentSection({ post }) {
+      const { state, dispatch } = useApp();
+      const [text, setText] = useState('');
+      const send = (e) => {
+        e.preventDefault();
+        if (!text.trim()) return;
+        dispatch({ type: 'ADD_COMMENT', postId: post.id, text: text.trim() });
+        setText('');
+      };
+      return (
+        <div className="px-4 pb-3 space-y-3">
+          {post.comments.map(c => {
+            const author = state.users.find(u => u.id === c.authorId);
+            return (
+              <div key={c.id} className="flex gap-2 items-start animate-pop">
+                <Avatar user={author} size={32} />
+                <div className="flex-1">
+                  <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl px-3 py-2 inline-block">
+                    <div className="font-semibold text-sm text-gray-900 dark:text-gray-100">{author?.name}</div>
+                    <div className="text-sm text-gray-800 dark:text-gray-200">{c.text}</div>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-3 mt-0.5">{timeAgo(c.timestamp)}</div>
+                </div>
+              </div>
+            );
+          })}
+          <form onSubmit={send} className="flex gap-2 items-center">
+            <Avatar user={state.users.find(u => u.id === state.currentUserId)} size={32} />
+            <input
+              value={text} onChange={e => setText(e.target.value)} placeholder="Write a comment..."
+              className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full px-4 py-2 text-sm outline-none text-gray-900 dark:text-gray-100"
+            />
+            <Tap as="button" type="submit" className="text-brand font-semibold text-sm px-2 disabled:opacity-40" disabled={!text.trim()}>Post</Tap>
+          </form>
+        </div>
+      );
+    }
+
+    function PostCard({ post, onOpenProfile }) {
+      const { state, dispatch } = useApp();
+      const author = state.users.find(u => u.id === post.authorId);
+      const me = state.currentUserId;
+      const myReaction = post.reactions[me];
+      const [showPicker, setShowPicker] = useState(false);
+      const [showComments, setShowComments] = useState(false);
+
+      const react = (key) => { dispatch({ type: 'REACT', postId: post.id, reaction: key }); setShowPicker(false); };
+      const likeBtn = myReaction ? reactionByKey(myReaction) : null;
+
+      return (
+        <div className="bg-white dark:bg-gray-800 sm:rounded-xl shadow-sm mb-2">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 pt-3">
+            <Tap onClick={() => onOpenProfile(author.id)} className="flex items-center gap-3">
+              <Avatar user={author} size={42} />
+              <div className="text-left">
+                <div className="font-semibold text-gray-900 dark:text-gray-100 leading-tight">{author?.name}</div>
+                <div className="text-xs text-gray-400">{timeAgo(post.timestamp)} · 🌎</div>
+              </div>
+            </Tap>
+          </div>
+
+          {/* Text */}
+          {post.text && <p className="px-4 py-2 text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{post.text}</p>}
+
+          {/* Image (gradient or uploaded data URL) */}
+          {post.image && (
+            <div className="relative w-full aspect-[4/3]"
+                 style={post.image.startsWith('data:')
+                    ? { backgroundImage: `url(${post.image})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                    : { background: post.image }}>
+              {post.imageCaption && (
+                <span className="absolute bottom-2 left-2 text-white/90 text-sm font-medium drop-shadow">{post.imageCaption}</span>
+              )}
+            </div>
+          )}
+
+          {/* Counts row */}
+          <div className="flex items-center justify-between px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
+            <ReactionSummary post={post} />
+            <div className="flex gap-3">
+              <span>{post.comments.length} comments</span>
+              <span>{post.shares} shares</span>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="grid grid-cols-3 border-t border-gray-100 dark:border-gray-700">
+            {/* Like cell + hover-intent wrapper so the picker stays open while
+                the cursor travels from the button up to the emoji row. */}
+            <div className="relative"
+                 onMouseEnter={() => setShowPicker(true)}
+                 onMouseLeave={() => setShowPicker(false)}>
+              {showPicker && (
+                <div className="absolute bottom-full mb-1 left-2 bg-white dark:bg-gray-700 shadow-lg rounded-full px-2 py-1 flex gap-1 animate-pop z-10">
+                  {REACTIONS.map(r => (
+                    <Tap key={r.key} onClick={() => react(r.key)} className="text-2xl hover:scale-125 transition-transform" title={r.label}>
+                      {r.emoji}
+                    </Tap>
+                  ))}
+                </div>
+              )}
+              <Tap
+                onClick={() => react(myReaction || 'like')}
+                className="w-full flex items-center justify-center gap-2 py-2 font-medium"
+                style={{ color: likeBtn ? likeBtn.color : undefined }}>
+                {likeBtn
+                  ? <><span className="text-lg">{likeBtn.emoji}</span><span>{likeBtn.label}</span></>
+                  : <span className="flex items-center gap-2 text-gray-500 dark:text-gray-400"><Icon name="like" size={20} />Like</span>}
+              </Tap>
+            </div>
+
+            <Tap onClick={() => setShowComments(s => !s)} className="flex items-center justify-center gap-2 py-2 text-gray-500 dark:text-gray-400 font-medium">
+              <Icon name="comment" size={20} /> Comment
+            </Tap>
+
+            <Tap onClick={() => dispatch({ type: 'SHARE', postId: post.id })} className="flex items-center justify-center gap-2 py-2 text-gray-500 dark:text-gray-400 font-medium">
+              <Icon name="share" size={20} /> Share
+            </Tap>
+          </div>
+
+          {showComments && <div className="border-t border-gray-100 dark:border-gray-700 pt-3"><CommentSection post={post} /></div>}
+        </div>
+      );
+    }
+
+    /* ============================================================
+       4d. COMPOSER  (create post with optional image)
+       ============================================================ */
+
+    function Composer({ open, onClose }) {
+      const { state, dispatch } = useApp();
+      const me = state.users.find(u => u.id === state.currentUserId);
+      const [text, setText] = useState('');
+      const [image, setImage] = useState(null);       // data URL or gradient
+      const fileRef = useRef();
+
+      const pickFile = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const r = new FileReader();
+        r.onload = () => setImage(r.result);          // store as data URL
+        r.readAsDataURL(file);
+      };
+
+      const addGradient = () => setImage(GRADIENTS[Math.floor((text.length + 1) % GRADIENTS.length)]);
+
+      const publish = () => {
+        if (!text.trim() && !image) return;
+        dispatch({ type: 'ADD_POST', text: text.trim(), image });
+        setText(''); setImage(null); onClose();
+      };
+
+      return (
+        <Modal open={open} onClose={onClose} title="Create Post">
+          <div className="flex items-center gap-3 mb-3">
+            <Avatar user={me} size={42} />
+            <div className="font-semibold text-gray-900 dark:text-gray-100">{me?.name}</div>
+          </div>
+
+          <textarea
+            autoFocus value={text} onChange={e => setText(e.target.value)}
+            placeholder={`What's on your mind, ${me?.name.split(' ')[0]}?`}
+            className="w-full h-32 resize-none outline-none bg-transparent text-lg text-gray-900 dark:text-gray-100 placeholder-gray-400"
+          />
+
+          {image && (
+            <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden mb-3"
+                 style={image.startsWith('data:') ? { backgroundImage: `url(${image})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: image }}>
+              <Tap onClick={() => setImage(null)} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1"><Icon name="x" size={18} /></Tap>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 border border-gray-200 dark:border-gray-600 rounded-xl p-2 mb-3">
+            <span className="text-sm text-gray-600 dark:text-gray-300 flex-1 ml-1">Add to your post</span>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickFile} />
+            <Tap onClick={() => fileRef.current.click()} className="p-1 text-green-500" title="Upload photo"><Icon name="image" /></Tap>
+            <Tap onClick={addGradient} className="p-1 text-purple-500" title="Add a color background">🎨</Tap>
+          </div>
+
+          <Tap as="button" onClick={publish} disabled={!text.trim() && !image}
+            className="w-full bg-brand text-white font-semibold py-2.5 rounded-xl disabled:opacity-40">
+            Post
+          </Tap>
+        </Modal>
+      );
+    }
+
+    /* ============================================================
+       4e. FEED SCREEN
+       ============================================================ */
+
+    function FeedScreen({ onOpenProfile, openComposer }) {
+      const { state } = useApp();
+      const me = state.users.find(u => u.id === state.currentUserId);
+      return (
+        <div className="pb-2">
+          {/* Composer launcher */}
+          <div className="bg-white dark:bg-gray-800 sm:rounded-xl shadow-sm p-3 mb-2 flex items-center gap-3">
+            <Avatar user={me} size={40} />
+            <button onClick={openComposer}
+              className="flex-1 text-left bg-gray-100 dark:bg-gray-700 rounded-full px-4 py-2 text-gray-500 dark:text-gray-400">
+              What's on your mind?
+            </button>
+            <Tap onClick={openComposer} className="text-green-500"><Icon name="image" /></Tap>
+          </div>
+
+          {state.posts.map(p => <PostCard key={p.id} post={p} onOpenProfile={onOpenProfile} />)}
+        </div>
+      );
+    }
+
+    /* ============================================================
+       4f. FRIENDS SCREEN  (requests + suggestions + friends)
+       ============================================================ */
+
+    function FriendsScreen({ onOpenProfile }) {
+      const { state, dispatch } = useApp();
+      const me = state.users.find(u => u.id === state.currentUserId);
+
+      // Incoming pending requests addressed to me
+      const incoming = state.friendRequests.filter(r => r.toId === me.id && r.status === 'pending');
+
+      // People I'm already friends with
+      const friends = state.users.filter(u => me.friends.includes(u.id));
+
+      // Suggestions: everyone who isn't me, isn't a friend, and has no pending request either way
+      const pendingIds = new Set(state.friendRequests.filter(r => r.status === 'pending').flatMap(r => [r.fromId, r.toId]));
+      const suggestions = state.users.filter(u =>
+        u.id !== me.id && !me.friends.includes(u.id) && !pendingIds.has(u.id)
+      );
+
+      const Row = ({ user, children }) => (
+        <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 sm:rounded-xl shadow-sm mb-2">
+          <Tap onClick={() => onOpenProfile(user.id)}><Avatar user={user} size={48} /></Tap>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">{user.name}</div>
+            <div className="text-xs text-gray-400 truncate">{user.friends.length} friends</div>
+          </div>
+          {children}
+        </div>
+      );
+
+      return (
+        <div>
+          {incoming.length > 0 && (
+            <>
+              <h2 className="font-bold text-lg px-3 py-2 text-gray-900 dark:text-gray-100">Friend Requests</h2>
+              {incoming.map(req => {
+                const u = state.users.find(x => x.id === req.fromId);
+                return (
+                  <Row key={req.id} user={u}>
+                    <div className="flex gap-2">
+                      <Tap as="button" onClick={() => dispatch({ type: 'RESPOND_FRIEND_REQUEST', requestId: req.id, accept: true })}
+                        className="bg-brand text-white text-sm font-semibold px-3 py-1.5 rounded-lg">Confirm</Tap>
+                      <Tap as="button" onClick={() => dispatch({ type: 'RESPOND_FRIEND_REQUEST', requestId: req.id, accept: false })}
+                        className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-semibold px-3 py-1.5 rounded-lg">Delete</Tap>
+                    </div>
+                  </Row>
+                );
+              })}
+            </>
+          )}
+
+          {suggestions.length > 0 && (
+            <>
+              <h2 className="font-bold text-lg px-3 py-2 text-gray-900 dark:text-gray-100">People You May Know</h2>
+              {suggestions.map(u => {
+                // Did I already send a request to this person this session?
+                const sent = state.friendRequests.some(r => r.fromId === me.id && r.toId === u.id);
+                return (
+                  <Row key={u.id} user={u}>
+                    <Tap as="button" disabled={sent}
+                      onClick={() => dispatch({ type: 'SEND_FRIEND_REQUEST', userId: u.id })}
+                      className={'text-sm font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 ' +
+                        (sent ? 'bg-gray-200 dark:bg-gray-700 text-gray-500' : 'bg-brand text-white')}>
+                      {sent ? 'Requested' : <><Icon name="userPlus" size={16}/> Add</>}
+                    </Tap>
+                  </Row>
+                );
+              })}
+            </>
+          )}
+
+          <h2 className="font-bold text-lg px-3 py-2 text-gray-900 dark:text-gray-100">Your Friends · {friends.length}</h2>
+          {friends.map(u => (
+            <Row key={u.id} user={u}>
+              <Tap as="button" onClick={() => onOpenProfile(u.id)}
+                className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-semibold px-3 py-1.5 rounded-lg">View</Tap>
+            </Row>
+          ))}
+        </div>
+      );
+    }
+
+    /* ============================================================
+       4g. NOTIFICATIONS SCREEN
+       ============================================================ */
+
+    function NotificationsScreen({ onOpenProfile }) {
+      const { state } = useApp();
+
+      // Build a live notification list:
+      //  - seed notifications
+      //  - plus pending friend requests addressed to me (so they always show)
+      const me = state.currentUserId;
+      const fromRequests = state.friendRequests
+        .filter(r => r.toId === me && r.status === 'pending')
+        .map(r => ({ id: 'fr-' + r.id, type: 'friend_request', fromId: r.fromId, read: false, timestamp: r.timestamp }));
+
+      const all = [...state.notifications, ...fromRequests]
+        .filter((n, i, arr) => arr.findIndex(x => x.fromId === n.fromId && x.type === n.type) === i) // dedupe
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+      const text = (n) => {
+        switch (n.type) {
+          case 'reaction': return ' reacted to your post';
+          case 'comment':  return ' commented on your post';
+          case 'friend_request': return ' sent you a friend request';
+          default: return ' interacted with you';
+        }
+      };
+      const iconFor = (n) => n.type === 'reaction' ? '👍' : n.type === 'comment' ? '💬' : '👤';
+
+      return (
+        <div>
+          <h2 className="font-bold text-xl px-3 py-3 text-gray-900 dark:text-gray-100">Notifications</h2>
+          {all.length === 0 && <p className="text-center text-gray-400 py-10">No notifications yet</p>}
+          {all.map(n => {
+            const u = state.users.find(x => x.id === n.fromId);
+            return (
+              <Tap key={n.id} onClick={() => onOpenProfile(n.fromId)}
+                className={'w-full flex items-center gap-3 p-3 mb-1 text-left bg-white dark:bg-gray-800 sm:rounded-xl shadow-sm ' + (n.read ? '' : 'border-l-4 border-brand')}>
+                <div className="relative">
+                  <Avatar user={u} size={48} />
+                  <span className="absolute -bottom-1 -right-1 text-lg">{iconFor(n)}</span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-gray-800 dark:text-gray-200">
+                    <span className="font-semibold">{u?.name}</span>{text(n)}
+                  </p>
+                  <span className="text-xs text-gray-400">{timeAgo(n.timestamp)}</span>
+                </div>
+              </Tap>
+            );
+          })}
+        </div>
+      );
+    }
+
+    /* ============================================================
+       4h. PROFILE SCREEN
+       ============================================================ */
+
+    function ProfileScreen({ userId, onBack, onOpenProfile }) {
+      const { state } = useApp();
+      const user = state.users.find(u => u.id === userId);
+      const isMe = userId === state.currentUserId;
+      const userPosts = state.posts.filter(p => p.authorId === userId);
+      const friends = state.users.filter(u => user.friends.includes(u.id));
+
+      return (
+        <div className="pb-4">
+          {/* Cover */}
+          <div className="relative h-40 sm:rounded-b-xl" style={{ background: `linear-gradient(135deg, ${colorFor(user.name)}, ${colorFor(user.id)})` }}>
+            {onBack && (
+              <Tap onClick={onBack} className="absolute top-3 left-3 bg-black/40 text-white rounded-full p-1.5"><Icon name="back" size={22} /></Tap>
+            )}
+          </div>
+
+          {/* Avatar + name */}
+          <div className="px-4 -mt-12 flex flex-col items-center">
+            <Avatar user={user} size={96} ring />
+            <h1 className="text-2xl font-bold mt-2 text-gray-900 dark:text-gray-100">{user.name}</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-center">{user.bio}</p>
+            <p className="text-gray-400 text-sm mt-1">{friends.length} friends · {userPosts.length} posts</p>
+          </div>
+
+          {/* Friends preview grid */}
+          <div className="px-4 mt-4">
+            <h2 className="font-bold text-gray-900 dark:text-gray-100 mb-2">Friends</h2>
+            <div className="grid grid-cols-3 gap-2">
+              {friends.slice(0, 6).map(f => (
+                <Tap key={f.id} onClick={() => onOpenProfile(f.id)} className="bg-white dark:bg-gray-800 rounded-xl p-2 flex flex-col items-center shadow-sm">
+                  <Avatar user={f} size={56} />
+                  <span className="text-xs mt-1 text-center text-gray-700 dark:text-gray-300 truncate w-full">{f.name}</span>
+                </Tap>
+              ))}
+              {friends.length === 0 && <p className="text-gray-400 text-sm col-span-3">No friends yet</p>}
+            </div>
+          </div>
+
+          {/* Posts */}
+          <div className="px-0 sm:px-0 mt-4">
+            <h2 className="font-bold text-gray-900 dark:text-gray-100 mb-2 px-4">Posts</h2>
+            {userPosts.length === 0 && <p className="text-gray-400 text-sm px-4">No posts yet</p>}
+            {userPosts.map(p => <PostCard key={p.id} post={p} onOpenProfile={onOpenProfile} />)}
+          </div>
+        </div>
+      );
+    }
+
+    /* ============================================================
+       4i. SEARCH SCREEN  (users + posts)
+       ============================================================ */
+
+    function SearchScreen({ onOpenProfile }) {
+      const { state } = useApp();
+      const [q, setQ] = useState('');
+      const query = q.trim().toLowerCase();
+
+      const users = query ? state.users.filter(u => u.name.toLowerCase().includes(query)) : [];
+      const posts = query ? state.posts.filter(p => p.text.toLowerCase().includes(query)) : [];
+
+      return (
+        <div>
+          <div className="p-3 sticky top-0 bg-gray-100 dark:bg-gray-900 z-10">
+            <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-full px-4 py-2 shadow-sm">
+              <Icon name="search" size={20} />
+              <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search people and posts"
+                className="flex-1 bg-transparent outline-none text-gray-900 dark:text-gray-100" />
+              {q && <Tap onClick={() => setQ('')} className="text-gray-400"><Icon name="x" size={18} /></Tap>}
+            </div>
+          </div>
+
+          {!query && <p className="text-center text-gray-400 py-10">Try searching for "Aisha" or "pizza"</p>}
+
+          {query && users.length > 0 && (
+            <>
+              <h3 className="font-bold px-3 py-2 text-gray-900 dark:text-gray-100">People</h3>
+              {users.map(u => (
+                <Tap key={u.id} onClick={() => onOpenProfile(u.id)} className="w-full flex items-center gap-3 p-3 bg-white dark:bg-gray-800 sm:rounded-xl shadow-sm mb-1 text-left">
+                  <Avatar user={u} size={44} />
+                  <div><div className="font-semibold text-gray-900 dark:text-gray-100">{u.name}</div>
+                  <div className="text-xs text-gray-400">{u.friends.length} friends</div></div>
+                </Tap>
+              ))}
+            </>
+          )}
+
+          {query && posts.length > 0 && (
+            <>
+              <h3 className="font-bold px-3 py-2 text-gray-900 dark:text-gray-100">Posts</h3>
+              {posts.map(p => <PostCard key={p.id} post={p} onOpenProfile={onOpenProfile} />)}
+            </>
+          )}
+
+          {query && users.length === 0 && posts.length === 0 && (
+            <p className="text-center text-gray-400 py-10">No results for "{q}"</p>
+          )}
+        </div>
+      );
+    }
+
+    /* ============================================================
+       5. SHELL — TopBar + BottomNav + routing
+       ============================================================ */
+
+    function TopBar({ title, onSearch, onLogout }) {
+      const { state, dispatch } = useApp();
+      return (
+        <div className="sticky top-0 z-20 bg-white dark:bg-gray-800 shadow-sm">
+          <div className="flex items-center justify-between px-4 py-2.5">
+            <h1 className="text-2xl font-extrabold text-brand">{title}</h1>
+            <div className="flex items-center gap-1">
+              <Tap onClick={() => dispatch({ type: 'TOGGLE_THEME' })} className="p-2 text-gray-600 dark:text-gray-300 rounded-full bg-gray-100 dark:bg-gray-700" title="Toggle theme">
+                <Icon name={state.theme === 'light' ? 'moon' : 'sun'} size={20} />
+              </Tap>
+              <Tap onClick={onSearch} className="p-2 text-gray-600 dark:text-gray-300 rounded-full bg-gray-100 dark:bg-gray-700" title="Search">
+                <Icon name="search" size={20} />
+              </Tap>
+              <Tap onClick={onLogout} className="p-2 text-gray-600 dark:text-gray-300 rounded-full bg-gray-100 dark:bg-gray-700" title="Log out">
+                <Icon name="logout" size={20} />
+              </Tap>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function BottomNav({ tab, setTab, badge }) {
+      const items = [
+        { key: 'feed',    icon: 'home' },
+        { key: 'friends', icon: 'users' },
+        { key: 'notifications', icon: 'bell' },
+        { key: 'profile', icon: 'profile' },
+      ];
+      return (
+        <div className="sticky bottom-0 z-20 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex">
+          {items.map(it => {
+            const active = tab === it.key;
+            return (
+              <Tap key={it.key} onClick={() => setTab(it.key)}
+                className={'flex-1 flex items-center justify-center py-2.5 relative ' + (active ? 'text-brand' : 'text-gray-500 dark:text-gray-400')}>
+                {it.key === 'profile'
+                  ? <ProfileNavIcon active={active} />
+                  : <Icon name={it.icon} size={26} fill={active} />}
+                {it.key === 'notifications' && badge > 0 && (
+                  <span className="absolute top-1.5 right-1/4 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">{badge}</span>
+                )}
+                {active && <span className="absolute bottom-0 w-8 h-0.5 bg-brand rounded-full" />}
+              </Tap>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // The profile tab shows the current user's avatar instead of a generic icon
+    function ProfileNavIcon({ active }) {
+      const { state } = useApp();
+      const me = state.users.find(u => u.id === state.currentUserId);
+      return <div className={active ? 'ring-2 ring-brand rounded-full' : ''}><Avatar user={me} size={26} /></div>;
+    }
+
+    /* ============================================================
+       ROOT APP
+       ============================================================ */
+
+    function App() {
+      const [state, dispatch] = useReducer(reducer, initialState);
+      const [tab, setTab] = useState('feed');            // active bottom-nav tab
+      const [viewProfileId, setViewProfileId] = useState(null); // overlay profile view
+      const [searchOpen, setSearchOpen] = useState(false);
+      const [composerOpen, setComposerOpen] = useState(false);
+
+      // Sync dark mode class on <html>
+      useEffect(() => {
+        document.documentElement.classList.toggle('dark', state.theme === 'dark');
+      }, [state.theme]);
+
+      // When the user opens Notifications, mark them read (clears the badge)
+      useEffect(() => {
+        if (tab === 'notifications') dispatch({ type: 'MARK_NOTIFS_READ' });
+      }, [tab]);
+
+      const openProfile = (id) => { setViewProfileId(id); setSearchOpen(false); };
+
+      // Unread badge count = unread notifs + pending incoming requests
+      const unread = useMemo(() => {
+        if (!state.currentUserId) return 0;
+        const u = state.notifications.filter(n => !n.read).length;
+        const reqs = state.friendRequests.filter(r => r.toId === state.currentUserId && r.status === 'pending').length;
+        return u + reqs;
+      }, [state.notifications, state.friendRequests, state.currentUserId]);
+
+      const ctx = { state, dispatch };
+
+      // ---- Logged out ----
+      if (!state.currentUserId) {
+        return (
+          <AppContext.Provider value={ctx}>
+            <Phone><AuthScreen /></Phone>
+          </AppContext.Provider>
+        );
+      }
+
+      const titles = { feed: 'bookface', friends: 'Friends', notifications: 'Alerts', profile: 'Profile' };
+
+      // Decide what fills the body
+      let body;
+      if (searchOpen) {
+        body = <SearchScreen onOpenProfile={openProfile} />;
+      } else if (viewProfileId) {
+        body = <ProfileScreen userId={viewProfileId} onBack={() => setViewProfileId(null)} onOpenProfile={openProfile} />;
+      } else if (tab === 'feed') {
+        body = <FeedScreen onOpenProfile={openProfile} openComposer={() => setComposerOpen(true)} />;
+      } else if (tab === 'friends') {
+        body = <FriendsScreen onOpenProfile={openProfile} />;
+      } else if (tab === 'notifications') {
+        body = <NotificationsScreen onOpenProfile={openProfile} />;
+      } else if (tab === 'profile') {
+        body = <ProfileScreen userId={state.currentUserId} onOpenProfile={openProfile} />;
+      }
+
+      return (
+        <AppContext.Provider value={ctx}>
+          <Phone>
+            <div className="flex flex-col h-full">
+              {/* Hide the top bar when viewing a profile overlay or search (they have their own headers) */}
+              {!viewProfileId && !searchOpen && (
+                <TopBar title={titles[tab]} onSearch={() => setSearchOpen(true)} onLogout={() => dispatch({ type: 'LOGOUT' })} />
+              )}
+              {searchOpen && (
+                <div className="sticky top-0 z-20 bg-white dark:bg-gray-800 shadow-sm flex items-center px-2 py-2">
+                  <Tap onClick={() => setSearchOpen(false)} className="p-2 text-gray-600 dark:text-gray-300"><Icon name="back" size={22} /></Tap>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100">Search</span>
+                </div>
+              )}
+
+              <div className="flex-1 overflow-y-auto no-scrollbar bg-gray-100 dark:bg-gray-900">
+                {body}
+              </div>
+
+              {/* Bottom nav hidden during search to keep focus on results */}
+              {!searchOpen && (
+                <BottomNav
+                  tab={viewProfileId ? '' : tab}
+                  setTab={(t) => { setViewProfileId(null); setTab(t); }}
+                  badge={unread}
+                />
+              )}
+            </div>
+          </Phone>
+
+          <Composer open={composerOpen} onClose={() => setComposerOpen(false)} />
+        </AppContext.Provider>
+      );
+    }
+
+    // Phone frame wrapper — centers a phone-sized viewport on desktop
+    function Phone({ children }) {
+      return (
+        <div className="min-h-screen flex items-center justify-center sm:py-6">
+          <div className="w-full sm:max-w-md sm:h-[844px] h-screen bg-gray-100 dark:bg-gray-900 sm:rounded-[2rem] sm:shadow-2xl overflow-hidden sm:border-8 border-black/80">
+            {children}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
