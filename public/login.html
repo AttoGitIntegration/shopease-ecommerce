@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShopEase — Sign in</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f3f4f6; margin: 0; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .card {
+      background: #fff; padding: 2rem; border-radius: 12px; width: 360px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    }
+    h1 { font-size: 1.4rem; margin: 0 0 1.25rem; text-align: center; color: #111827; }
+    label { display: block; font-size: .8rem; color: #374151; margin: .75rem 0 .25rem; }
+    input {
+      width: 100%; padding: .6rem .75rem; border: 1px solid #d1d5db;
+      border-radius: 8px; font-size: .95rem;
+    }
+    button {
+      width: 100%; padding: .65rem; border: none; border-radius: 8px;
+      font-size: .95rem; cursor: pointer; margin-top: 1rem;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-sso {
+      background: #fff; color: #111827; border: 1px solid #d1d5db;
+      display: flex; align-items: center; justify-content: center; gap: .5rem;
+    }
+    .btn-sso:hover { background: #f9fafb; }
+    .divider {
+      display: flex; align-items: center; text-align: center;
+      color: #9ca3af; font-size: .8rem; margin: 1.25rem 0 .25rem;
+    }
+    .divider::before, .divider::after {
+      content: ""; flex: 1; border-bottom: 1px solid #e5e7eb;
+    }
+    .divider:not(:empty)::before { margin-right: .75em; }
+    .divider:not(:empty)::after { margin-left: .75em; }
+    .alert {
+      background: #fee2e2; color: #991b1b; padding: .6rem .75rem;
+      border-radius: 8px; font-size: .85rem; margin-bottom: 1rem; display: none;
+    }
+    #sso-icon { width: 18px; height: 18px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Sign in to ShopEase</h1>
+
+    <div id="error" class="alert"></div>
+
+    <form id="login-form">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" required />
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required />
+      <button type="submit" class="btn-primary">Sign in</button>
+    </form>
+
+    <!-- Single Sign-On -->
+    <div id="sso-block" style="display:none;">
+      <div class="divider">or</div>
+      <button id="sso-btn" class="btn-sso" type="button">
+        <svg id="sso-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+          <polyline points="10 17 15 12 10 7" />
+          <line x1="15" y1="12" x2="3" y2="12" />
+        </svg>
+        <span id="sso-label">Login with SSO</span>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const errorBox = document.getElementById('error');
+
+    // Surface an error passed back from the SSO callback (?error=...).
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error')) {
+      errorBox.textContent = params.get('error');
+      errorBox.style.display = 'block';
+    }
+
+    // Conditionally show the SSO button based on server configuration.
+    fetch('/api/auth/sso/config')
+      .then(r => r.json())
+      .then(cfg => {
+        if (!cfg.enabled) return;
+        document.getElementById('sso-block').style.display = 'block';
+        document.getElementById('sso-label').textContent = cfg.buttonLabel || 'Login with SSO';
+        document.getElementById('sso-btn').addEventListener('click', () => {
+          // Full-page navigation so the browser follows the IdP redirect chain.
+          window.location.href = cfg.loginUrl;
+        });
+      })
+      .catch(() => { /* SSO simply stays hidden if config can't be fetched */ });
+
+    // Password login.
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBox.style.display = 'none';
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: document.getElementById('email').value,
+          password: document.getElementById('password').value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errorBox.textContent = data.error || 'Login failed';
+        errorBox.style.display = 'block';
+        return;
+      }
+      localStorage.setItem('token', data.token);
+      window.location.href = '/public/';
+    });
+  </script>
+</body>
+</html>
