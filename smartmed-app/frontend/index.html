@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartMed - Order Medicines Online</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">+</span>
+      <span class="brand-name">SmartMed</span>
+    </div>
+    <nav class="nav">
+      <a href="#" data-view="medicines" class="nav-link active">Medicines</a>
+      <a href="#" data-view="orders" class="nav-link">My Orders</a>
+      <a href="#" data-view="cart" class="nav-link">
+        Cart <span id="cart-badge" class="badge">0</span>
+      </a>
+    </nav>
+    <div class="user-area" id="user-area">
+      <button class="btn-secondary" id="open-login">Login</button>
+      <button class="btn-primary" id="open-register">Sign up</button>
+    </div>
+  </header>
+
+  <main id="app">
+    <!-- Medicines view -->
+    <section id="view-medicines" class="view">
+      <div class="hero">
+        <h1>Order medicines online, delivered to your door</h1>
+        <p>Fast, reliable and prescription-aware.</p>
+      </div>
+
+      <div class="filters">
+        <input type="search" id="search-input" placeholder="Search medicines, brands, conditions..." />
+        <select id="category-filter">
+          <option value="">All categories</option>
+        </select>
+        <label class="checkbox">
+          <input type="checkbox" id="otc-only" />
+          OTC only (no prescription)
+        </label>
+      </div>
+
+      <div id="medicine-grid" class="grid"></div>
+    </section>
+
+    <!-- Cart view -->
+    <section id="view-cart" class="view hidden">
+      <h2>Your Cart</h2>
+      <div id="cart-contents"></div>
+      <div id="cart-summary" class="cart-summary hidden">
+        <div class="row"><span>Subtotal</span><span id="cart-subtotal">₹0</span></div>
+        <div class="row"><span>Shipping</span><span id="cart-shipping">₹0</span></div>
+        <div class="row total"><span>Total</span><span id="cart-total">₹0</span></div>
+        <div id="rx-warning" class="rx-warning hidden">
+          One or more items require a prescription. Please upload it during checkout.
+        </div>
+        <button class="btn-primary btn-large" id="checkout-btn">Proceed to Checkout</button>
+      </div>
+    </section>
+
+    <!-- Orders view -->
+    <section id="view-orders" class="view hidden">
+      <h2>My Orders</h2>
+      <div id="orders-list"></div>
+    </section>
+  </main>
+
+  <!-- Auth modal -->
+  <div id="auth-modal" class="modal hidden">
+    <div class="modal-content">
+      <button class="close" data-close>&times;</button>
+      <div class="tabs">
+        <button class="tab active" data-tab="login">Login</button>
+        <button class="tab" data-tab="register">Sign up</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <input type="email" name="email" placeholder="Email" required />
+        <input type="password" name="password" placeholder="Password" required />
+        <button class="btn-primary" type="submit">Login</button>
+        <p class="form-error" id="login-error"></p>
+      </form>
+
+      <form id="register-form" class="auth-form hidden">
+        <input type="text" name="name" placeholder="Full name" required />
+        <input type="email" name="email" placeholder="Email" required />
+        <input type="tel" name="phone" placeholder="Phone" required />
+        <input type="password" name="password" placeholder="Password" required />
+        <button class="btn-primary" type="submit">Create account</button>
+        <p class="form-error" id="register-error"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Checkout modal -->
+  <div id="checkout-modal" class="modal hidden">
+    <div class="modal-content wide">
+      <button class="close" data-close>&times;</button>
+      <h2>Checkout</h2>
+
+      <div class="checkout-section">
+        <h3>1. Delivery Address</h3>
+        <div id="address-list"></div>
+        <details>
+          <summary>+ Add new address</summary>
+          <form id="address-form" class="inline-form">
+            <input name="label" placeholder="Label (Home/Office)" />
+            <input name="line1" placeholder="Address line" required />
+            <input name="city" placeholder="City" required />
+            <input name="state" placeholder="State" required />
+            <input name="pincode" placeholder="Pincode" required />
+            <button class="btn-secondary" type="submit">Save Address</button>
+          </form>
+        </details>
+      </div>
+
+      <div class="checkout-section" id="rx-section">
+        <h3>2. Prescription</h3>
+        <p class="muted">Some items in your cart require a prescription.</p>
+        <form id="rx-form" class="inline-form">
+          <input name="fileName" placeholder="Prescription file name (e.g. rx-john.pdf)" required />
+          <input name="notes" placeholder="Notes (optional)" />
+          <button class="btn-secondary" type="submit">Upload</button>
+        </form>
+        <p id="rx-status" class="muted"></p>
+      </div>
+
+      <div class="checkout-section">
+        <h3>3. Payment Method</h3>
+        <div class="payment-options">
+          <label><input type="radio" name="payment" value="COD" checked /> Cash on Delivery</label>
+          <label><input type="radio" name="payment" value="UPI" /> UPI</label>
+          <label><input type="radio" name="payment" value="CARD" /> Card</label>
+          <label><input type="radio" name="payment" value="NETBANKING" /> Net Banking</label>
+        </div>
+      </div>
+
+      <div class="checkout-section summary-block">
+        <h3>Order Summary</h3>
+        <div id="checkout-summary"></div>
+      </div>
+
+      <button class="btn-primary btn-large" id="place-order-btn">Place Order</button>
+      <p class="form-error" id="order-error"></p>
+    </div>
+  </div>
+
+  <!-- Order confirmation -->
+  <div id="confirm-modal" class="modal hidden">
+    <div class="modal-content">
+      <button class="close" data-close>&times;</button>
+      <div class="success-icon">✓</div>
+      <h2>Order Placed!</h2>
+      <p id="confirm-text"></p>
+      <button class="btn-primary" data-close>OK</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="./js/api.js"></script>
+  <script src="./js/state.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>

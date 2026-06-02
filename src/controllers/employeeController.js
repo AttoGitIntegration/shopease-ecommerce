@@ -1,8 +1,17 @@
+const { revokeLoginByEmail } = require('./authController');
+
 const employees = [];
 
 const DEPARTMENTS = ['engineering', 'sales', 'marketing', 'hr', 'finance', 'support', 'operations'];
 const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contract', 'intern'];
 const EMAIL_RE = /^[\w.+-]+@[\w-]+\.[\w.-]+$/;
+
+// Employment lifecycle. `terminated` is terminal — once set, status cannot change.
+const EMPLOYMENT_STATUSES = ['active', 'on_leave', 'suspended', 'terminated'];
+const TERMINAL_STATUS = 'terminated';
+// Statuses in which the employee must not retain access; entering one revokes
+// any active login for the linked account.
+const LOGIN_REVOKED_STATUSES = ['suspended', 'terminated'];
 
 exports.employees = employees;
 exports._reset = () => { employees.length = 0; };
@@ -69,4 +78,55 @@ exports.getById = (req, res) => {
   const employee = employees.find(e => e.id === parseInt(req.params.id));
   if (!employee) return res.status(404).json({ error: 'Employee not found' });
   res.json(employee);
+};
+
+/** Apply a status change to an employee, recording audit fields and revoking
+ *  the linked login when the new status is one that should remove access. */
+const applyStatus = (employee, status, reason, adminId) => {
+  employee.status = status;
+  employee.statusReason = reason || null;
+  employee.statusUpdatedAt = new Date().toISOString();
+  employee.statusUpdatedBy = adminId || null;
+
+  let loginRevoked = false;
+  if (LOGIN_REVOKED_STATUSES.includes(status)) {
+    loginRevoked = revokeLoginByEmail(employee.email) > 0;
+  }
+  return loginRevoked;
+};
+
+// PATCH /api/employees/:id/terminate — terminate an employee and revoke login.
+exports.terminate = (req, res) => {
+  const employee = employees.find(e => e.id === parseInt(req.params.id));
+  if (!employee) return res.status(404).json({ error: 'Employee not found' });
+  if (employee.status === TERMINAL_STATUS)
+    return res.status(409).json({ error: 'Employee already terminated' });
+
+  const reason = req.body?.reason || 'No reason provided';
+  const loginRevoked = applyStatus(employee, TERMINAL_STATUS, reason, req.adminId);
+  // Preserve the canonical termination audit fields used by reporting.
+  employee.terminatedAt = employee.statusUpdatedAt;
+  employee.terminatedBy = req.adminId || null;
+  employee.terminationReason = reason;
+
+  res.json({ message: 'Employee terminated', loginRevoked, employee });
+};
+
+// PATCH /api/employees/:id/status — manage employment status (non-terminal).
+exports.updateStatus = (req, res) => {
+  const employee = employees.find(e => e.id === parseInt(req.params.id));
+  if (!employee) return res.status(404).json({ error: 'Employee not found' });
+
+  const { status, reason } = req.body || {};
+  if (!status || !EMPLOYMENT_STATUSES.includes(status))
+    return res.status(400).json({ error: `status must be one of ${EMPLOYMENT_STATUSES.join(', ')}` });
+  if (status === TERMINAL_STATUS)
+    return res.status(400).json({ error: 'Use the terminate endpoint to terminate an employee' });
+  if (employee.status === TERMINAL_STATUS)
+    return res.status(409).json({ error: 'Cannot change status of a terminated employee' });
+  if (employee.status === status)
+    return res.status(400).json({ error: `Employee already ${status}` });
+
+  const loginRevoked = applyStatus(employee, status, reason, req.adminId);
+  res.json({ message: 'Employee status updated', loginRevoked, employee });
 };
