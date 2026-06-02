@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartMed — Order Medicines</title>
+  <style>
+    :root { --bg:#f6f8fb; --card:#fff; --ink:#1a1f36; --muted:#5a6b87; --line:#e6eaf2; --brand:#2563eb; --good:#16a34a; --warn:#ca8a04; --bad:#dc2626; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+    header { background:#fff; border-bottom:1px solid var(--line); padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
+    header h1 { margin:0; font-size:18px; color:var(--brand); }
+    main { max-width:1100px; margin:0 auto; padding:24px; display:grid; grid-template-columns:1fr 360px; gap:20px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:16px; }
+    .card h2 { margin:0 0 12px; font-size:15px; color:var(--ink); letter-spacing:.02em; text-transform:uppercase; }
+    .hide { display:none; }
+    button, input, select { font:inherit; }
+    button { background:var(--brand); color:#fff; border:0; padding:8px 14px; border-radius:6px; cursor:pointer; }
+    button.secondary { background:#fff; color:var(--brand); border:1px solid var(--brand); }
+    button.ghost { background:transparent; color:var(--muted); border:1px solid var(--line); padding:6px 10px; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    input, select { padding:8px 10px; border:1px solid var(--line); border-radius:6px; width:100%; }
+    label { display:block; margin:6px 0 2px; color:var(--muted); font-size:12px; }
+    .row { display:flex; gap:8px; align-items:center; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+    .badge.rx     { background:#fef3c7; color:#a16207; }
+    .badge.otc    { background:#dcfce7; color:#15803d; }
+    .badge.cold   { background:#dbeafe; color:#1d4ed8; }
+    .badge.oos    { background:#fee2e2; color:#b91c1c; }
+    .toast { position:fixed; right:20px; bottom:20px; background:var(--ink); color:#fff; padding:10px 14px; border-radius:6px; opacity:0; transition:opacity .25s; max-width:320px; }
+    .toast.show { opacity:1; }
+    .toast.error { background:var(--bad); }
+    .timeline li { color:var(--muted); }
+    .timeline li.done { color:var(--good); font-weight:600; }
+    .mute { color:var(--muted); font-size:12px; }
+    .total-row { display:flex; justify-content:space-between; padding:4px 0; }
+    .total-row.grand { border-top:1px solid var(--line); padding-top:8px; margin-top:6px; font-weight:600; font-size:15px; }
+    .tabs { display:flex; gap:6px; margin-bottom:12px; }
+    .tabs button { background:#fff; color:var(--muted); border:1px solid var(--line); }
+    .tabs button.active { background:var(--brand); color:#fff; border-color:var(--brand); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SmartMed</h1>
+    <div id="userBar">
+      <span id="userLabel" class="mute">Not signed in</span>
+      <button id="logoutBtn" class="ghost hide" style="margin-left:10px">Log out</button>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <!-- LOGIN -->
+      <div id="loginCard" class="card">
+        <h2>Sign in</h2>
+        <div class="grid2">
+          <div>
+            <label for="phone">Phone</label>
+            <input id="phone" placeholder="9999900001" />
+          </div>
+          <div>
+            <label for="otp">OTP (use 123456)</label>
+            <input id="otp" placeholder="123456" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button id="sendOtpBtn" class="secondary">Send OTP</button>
+          <button id="loginBtn">Sign in</button>
+          <span id="otpHint" class="mute"></span>
+        </div>
+      </div>
+
+      <!-- APP -->
+      <div id="appView" class="hide">
+        <div class="tabs">
+          <button data-tab="catalog" class="active">Catalog</button>
+          <button data-tab="cart">Cart <span id="cartCount" class="mute"></span></button>
+          <button data-tab="orders">My orders</button>
+        </div>
+
+        <!-- CATALOG -->
+        <div id="tab-catalog">
+          <div class="card">
+            <h2>Browse medicines</h2>
+            <div class="row" style="margin-bottom:10px">
+              <input id="searchBox" placeholder="Search by name or composition" />
+              <button id="searchBtn">Search</button>
+              <button id="clearSearchBtn" class="ghost">Clear</button>
+            </div>
+            <table id="medTable">
+              <thead><tr><th>Medicine</th><th>Pack</th><th>Price</th><th>Stock</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CART -->
+        <div id="tab-cart" class="hide">
+          <div class="card">
+            <h2>Cart</h2>
+            <table id="cartTable">
+              <thead><tr><th>Item</th><th>Qty</th><th>Subtotal</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <p id="cartEmpty" class="mute">Cart is empty.</p>
+          </div>
+          <div id="checkoutCard" class="card hide">
+            <h2>Checkout</h2>
+            <label for="addressSel">Deliver to</label>
+            <select id="addressSel"></select>
+            <div class="grid2" style="margin-top:8px">
+              <div>
+                <label for="slotSel">Delivery slot</label>
+                <select id="slotSel">
+                  <option value="standard">Standard (next day)</option>
+                  <option value="express">Express (≤ 2 h)</option>
+                  <option value="scheduled">Scheduled</option>
+                </select>
+              </div>
+              <div>
+                <label for="paySel">Payment</label>
+                <select id="paySel">
+                  <option value="upi">UPI</option>
+                  <option value="card">Card</option>
+                  <option value="netbanking">Netbanking</option>
+                  <option value="wallet">Wallet</option>
+                  <option value="cod">Cash on delivery</option>
+                </select>
+              </div>
+            </div>
+            <div id="rxBlock" class="card hide" style="margin-top:12px; background:#fefce8; border-color:#fde68a">
+              <h2 style="color:#a16207">Prescription required</h2>
+              <p class="mute" style="margin:0 0 8px">Cart contains Rx medicines. Upload a prescription (PDF / JPEG / PNG, ≤ 5 MB).</p>
+              <input id="rxFile" type="file" accept=".pdf,.jpg,.jpeg,.png" />
+              <button id="uploadRxBtn" class="secondary" style="margin-top:8px">Upload</button>
+              <p id="rxStatus" class="mute"></p>
+            </div>
+            <div style="margin-top:12px">
+              <button id="placeOrderBtn">Place order</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ORDERS -->
+        <div id="tab-orders" class="hide">
+          <div class="card">
+            <h2>My orders</h2>
+            <table id="orderTable">
+              <thead><tr><th>Order</th><th>Total</th><th>Status</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <p id="ordersEmpty" class="mute">No orders yet.</p>
+          </div>
+          <div id="orderDetail" class="card hide">
+            <h2>Order detail</h2>
+            <div id="orderDetailBody"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SIDEBAR -->
+    <aside>
+      <div class="card">
+        <h2>Cart summary</h2>
+        <div id="summaryBody"><p class="mute">Empty cart.</p></div>
+      </div>
+      <div class="card">
+        <h2>Tips</h2>
+        <p class="mute">• Use phone <code>9999900001</code> and OTP <code>123456</code>.<br>
+        • Rx medicines require an uploaded prescription before checkout.<br>
+        • Schedule H1 / X medicines cannot be paid by COD.</p>
+      </div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const API = '/api/smartmed';
+    const state = {
+      token: null,
+      user: null,
+      addresses: [],
+      prescriptionId: null,
+      activeTab: 'catalog',
+      cart: { items: [], subtotal: 0, requiresRx: false, coldChain: false, lineCount: 0 }
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => '₹' + (n || 0).toFixed(2);
+
+    const toast = (msg, isError = false) => {
+      const t = $('toast');
+      t.textContent = msg;
+      t.classList.toggle('error', isError);
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2400);
+    };
+
+    const api = async (path, opts = {}) => {
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+      if (state.token) headers['x-user-token'] = state.token;
+      const res = await fetch(API + path, { ...opts, headers });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      return body;
+    };
+
+    // --- AUTH ---
+    $('sendOtpBtn').onclick = async () => {
+      try {
+        const phone = $('phone').value.trim();
+        const r = await api('/auth/otp', { method: 'POST', body: JSON.stringify({ phone }) });
+        $('otpHint').textContent = 'OTP sent to ' + r.maskedPhone;
+        toast('OTP sent (use 123456)');
+      } catch (e) { toast(e.message, true); }
+    };
+
+    $('loginBtn').onclick = async () => {
+      try {
+        const phone = $('phone').value.trim();
+        const otp = $('otp').value.trim();
+        const r = await api('/auth/login', { method: 'POST', body: JSON.stringify({ phone, otp }) });
+        state.token = r.session.token;
+        state.user = r.user;
+        $('userLabel').textContent = `Signed in as ${r.user.name}`;
+        $('logoutBtn').classList.remove('hide');
+        $('loginCard').classList.add('hide');
+        $('appView').classList.remove('hide');
+        await Promise.all([loadCatalog(), loadCart(), loadAddresses(), loadOrders()]);
+      } catch (e) { toast(e.message, true); }
+    };
+
+    $('logoutBtn').onclick = async () => {
+      try { await api('/auth/logout', { method: 'POST', body: '{}' }); } catch {}
+      state.token = null;
+      state.user = null;
+      $('userLabel').textContent = 'Not signed in';
+      $('logoutBtn').classList.add('hide');
+      $('loginCard').classList.remove('hide');
+      $('appView').classList.add('hide');
+    };
+
+    // --- TABS ---
+    document.querySelectorAll('.tabs button').forEach(b => {
+      b.onclick = () => {
+        document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        state.activeTab = b.dataset.tab;
+        ['catalog', 'cart', 'orders'].forEach(t => {
+          $('tab-' + t).classList.toggle('hide', t !== state.activeTab);
+        });
+        if (state.activeTab === 'orders') loadOrders();
+      };
+    });
+
+    // --- CATALOG ---
+    const renderCatalog = (meds) => {
+      const tbody = $('medTable').querySelector('tbody');
+      tbody.innerHTML = meds.map(m => `
+        <tr>
+          <td>
+            <strong>${m.name}</strong> <span class="mute">${m.strength}</span><br>
+            <span class="mute">${m.composition}</span><br>
+            ${m.rxRequired ? '<span class="badge rx">Rx</span>' : '<span class="badge otc">OTC</span>'}
+            ${m.coldChain ? ' <span class="badge cold">Cold-chain</span>' : ''}
+            ${m.stock === 0 ? ' <span class="badge oos">Out of stock</span>' : ''}
+          </td>
+          <td>${m.pack}</td>
+          <td>${fmt(m.mrp)}</td>
+          <td>${m.stock}</td>
+          <td>
+            <button class="secondary" data-med="${m.id}" ${m.stock === 0 ? 'disabled' : ''}>Add</button>
+          </td>
+        </tr>`).join('');
+      tbody.querySelectorAll('button[data-med]').forEach(btn => {
+        btn.onclick = () => addToCart(btn.dataset.med);
+      });
+    };
+
+    const loadCatalog = async (q) => {
+      const qs = q ? '?q=' + encodeURIComponent(q) : '';
+      const r = await api('/medicines' + qs);
+      renderCatalog(r.medicines);
+    };
+
+    $('searchBtn').onclick = () => loadCatalog($('searchBox').value.trim());
+    $('clearSearchBtn').onclick = () => { $('searchBox').value = ''; loadCatalog(); };
+    $('searchBox').addEventListener('keyup', e => { if (e.key === 'Enter') loadCatalog($('searchBox').value.trim()); });
+
+    // --- CART ---
+    const addToCart = async (medicineId) => {
+      try {
+        await api('/cart/items', { method: 'POST', body: JSON.stringify({ medicineId, quantity: 1 }) });
+        toast('Added to cart');
+        await loadCart();
+      } catch (e) { toast(e.message, true); }
+    };
+
+    const updateQty = async (medicineId, quantity) => {
+      try {
+        await api(`/cart/items/${medicineId}`, { method: 'PUT', body: JSON.stringify({ quantity }) });
+        await loadCart();
+      } catch (e) { toast(e.message, true); }
+    };
+
+    const removeItem = async (medicineId) => {
+      try {
+        await api(`/cart/items/${medicineId}`, { method: 'DELETE' });
+        await loadCart();
+      } catch (e) { toast(e.message, true); }
+    };
+
+    const loadCart = async () => {
+      const r = await api('/cart');
+      state.cart = r.cart;
+      const tbody = $('cartTable').querySelector('tbody');
+      const empty = $('cartEmpty');
+      $('cartCount').textContent = state.cart.items.length ? `(${state.cart.items.length})` : '';
+      if (!state.cart.items.length) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hide');
+        $('checkoutCard').classList.add('hide');
+      } else {
+        empty.classList.add('hide');
+        $('checkoutCard').classList.remove('hide');
+        tbody.innerHTML = state.cart.items.map(i => `
+          <tr>
+            <td><strong>${i.name}</strong> ${i.rxRequired ? '<span class="badge rx">Rx</span>' : ''}</td>
+            <td>
+              <input type="number" value="${i.quantity}" min="0" max="30" data-qty="${i.medicineId}" style="width:70px" />
+            </td>
+            <td>${fmt(i.subtotal)}</td>
+            <td><button class="ghost" data-rm="${i.medicineId}">Remove</button></td>
+          </tr>`).join('');
+        tbody.querySelectorAll('input[data-qty]').forEach(inp => {
+          inp.addEventListener('change', () => updateQty(inp.dataset.qty, parseInt(inp.value, 10)));
+        });
+        tbody.querySelectorAll('button[data-rm]').forEach(b => {
+          b.onclick = () => removeItem(b.dataset.rm);
+        });
+      }
+      $('rxBlock').classList.toggle('hide', !state.cart.requiresRx);
+      renderSummary();
+    };
+
+    const renderSummary = () => {
+      const c = state.cart;
+      if (!c.items.length) {
+        $('summaryBody').innerHTML = '<p class="mute">Empty cart.</p>';
+        return;
+      }
+      const slot = $('slotSel') ? $('slotSel').value : 'standard';
+      const deliv = (slot === 'express' ? (c.coldChain ? 120 : 80) : slot === 'scheduled' ? 30 : (c.coldChain ? 100 : 49));
+      const tax = Math.round(c.subtotal * 0.05 * 100) / 100;
+      const total = c.subtotal + deliv + tax;
+      $('summaryBody').innerHTML = `
+        <div class="total-row"><span>Subtotal (${c.lineCount} items)</span><span>${fmt(c.subtotal)}</span></div>
+        <div class="total-row"><span>Delivery (${slot})</span><span>${fmt(deliv)}</span></div>
+        <div class="total-row"><span>GST 5%</span><span>${fmt(tax)}</span></div>
+        <div class="total-row grand"><span>Total</span><span>${fmt(total)}</span></div>
+        ${c.requiresRx ? '<p class="mute" style="margin-top:8px;color:#a16207">Prescription required.</p>' : ''}
+        ${c.coldChain ? '<p class="mute">Includes cold-chain item.</p>' : ''}
+      `;
+    };
+
+    // --- ADDRESSES ---
+    const loadAddresses = async () => {
+      const r = await api('/addresses');
+      state.addresses = r.addresses;
+      $('addressSel').innerHTML = r.addresses.map(a =>
+        `<option value="${a.id}" ${a.isDefault ? 'selected' : ''}>${a.label} — ${a.line1}, ${a.city} ${a.pincode}</option>`
+      ).join('');
+    };
+
+    // --- PRESCRIPTION (simulated upload) ---
+    $('uploadRxBtn').onclick = async () => {
+      const f = $('rxFile').files[0];
+      if (!f) return toast('Choose a file first', true);
+      try {
+        const r = await api('/prescriptions', {
+          method: 'POST',
+          body: JSON.stringify({ filename: f.name, mimeType: f.type || 'application/pdf', sizeBytes: f.size })
+        });
+        state.prescriptionId = r.prescription.id;
+        $('rxStatus').textContent = `Uploaded: ${r.prescription.id}`;
+        toast('Prescription uploaded');
+      } catch (e) { toast(e.message, true); }
+    };
+
+    // --- ORDERS ---
+    $('placeOrderBtn').onclick = async () => {
+      try {
+        const body = {
+          addressId: $('addressSel').value,
+          slot: $('slotSel').value,
+          paymentMethod: $('paySel').value,
+          prescriptionId: state.prescriptionId,
+          idempotencyKey: 'web-' + Date.now()
+        };
+        const r = await api('/orders', { method: 'POST', body: JSON.stringify(body) });
+        toast(`Order ${r.order.id} placed (${r.order.status})`);
+        state.prescriptionId = null;
+        $('rxStatus').textContent = '';
+        await loadCart();
+        await loadOrders();
+        document.querySelector('.tabs button[data-tab="orders"]').click();
+      } catch (e) { toast(e.message, true); }
+    };
+
+    $('slotSel') && $('slotSel').addEventListener('change', renderSummary);
+
+    const loadOrders = async () => {
+      if (!state.token) return;
+      const r = await api('/orders');
+      const tbody = $('orderTable').querySelector('tbody');
+      $('ordersEmpty').classList.toggle('hide', r.count > 0);
+      tbody.innerHTML = r.orders.map(o => `
+        <tr>
+          <td><strong>${o.id}</strong><br><span class="mute">${o.items.length} items</span></td>
+          <td>${fmt(o.total)}</td>
+          <td><span class="badge ${o.status === 'cancelled' || o.status === 'returned' ? 'oos' : 'otc'}">${o.status.replace(/_/g, ' ')}</span></td>
+          <td><button class="secondary" data-view="${o.id}">View</button></td>
+        </tr>`).join('');
+      tbody.querySelectorAll('button[data-view]').forEach(b => {
+        b.onclick = () => showOrder(b.dataset.view);
+      });
+    };
+
+    const showOrder = async (id) => {
+      const r = await api('/orders/' + id);
+      const o = r.order;
+      const flow = ['placed', 'awaiting_verification', 'verified', 'packed', 'out_for_delivery', 'delivered'];
+      const reached = flow.indexOf(o.status);
+      $('orderDetail').classList.remove('hide');
+      $('orderDetailBody').innerHTML = `
+        <p><strong>${o.id}</strong> — ${fmt(o.total)} via ${o.paymentMethod.toUpperCase()}</p>
+        <p class="mute">Delivers to ${o.address.line1}, ${o.address.city} ${o.address.pincode}</p>
+        <ol class="timeline">
+          ${flow.map((s, i) => `<li class="${i <= reached ? 'done' : ''}">${s.replace(/_/g, ' ')}</li>`).join('')}
+        </ol>
+        <h3 style="font-size:13px;margin:12px 0 4px">Items</h3>
+        <ul>${o.items.map(i => `<li>${i.name} × ${i.quantity} — ${fmt(i.subtotal)}</li>`).join('')}</ul>
+        <div class="row" style="margin-top:10px">
+          ${['placed', 'awaiting_verification', 'verified'].includes(o.status) ? `<button class="ghost" data-cancel="${o.id}">Cancel</button>` : ''}
+          ${o.status === 'delivered' ? `<button class="ghost" data-return="${o.id}">Return</button>` : ''}
+          ${reached < flow.length - 1 && !['cancelled', 'returned'].includes(o.status) ? `<button class="secondary" data-advance="${o.id}">Advance (demo)</button>` : ''}
+        </div>`;
+      $('orderDetailBody').querySelector('[data-cancel]')?.addEventListener('click', async () => {
+        const reason = prompt('Cancel reason?');
+        if (!reason) return;
+        try { await api(`/orders/${id}/cancel`, { method: 'PUT', body: JSON.stringify({ reason }) }); toast('Cancelled'); await loadOrders(); showOrder(id); }
+        catch (e) { toast(e.message, true); }
+      });
+      $('orderDetailBody').querySelector('[data-return]')?.addEventListener('click', async () => {
+        const reason = prompt('Return reason?');
+        if (!reason) return;
+        try { await api(`/orders/${id}/return`, { method: 'PUT', body: JSON.stringify({ reason }) }); toast('Return initiated'); await loadOrders(); showOrder(id); }
+        catch (e) { toast(e.message, true); }
+      });
+      $('orderDetailBody').querySelector('[data-advance]')?.addEventListener('click', async () => {
+        try { await api(`/orders/${id}/advance`, { method: 'POST', body: '{}' }); await loadOrders(); showOrder(id); }
+        catch (e) { toast(e.message, true); }
+      });
+    };
+  </script>
+</body>
+</html>
