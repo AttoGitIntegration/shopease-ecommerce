@@ -17,6 +17,7 @@ app.use('/api/return-shipments', require('./routes/returnShipments'));
 app.use('/api/prescriptions', require('./routes/prescriptions'));
 app.use('/api/medical-history', require('./routes/medicalHistory'));
 app.use('/api/sprints',  require('./routes/sprints'));
+app.use('/api/employees', require('./routes/employees'));
 app.use('/api/admin/auth',     require('./routes/adminAuth'));
 app.use('/api/admin/checkout', require('./routes/adminCheckout'));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
