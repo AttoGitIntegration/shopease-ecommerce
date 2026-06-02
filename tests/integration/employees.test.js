@@ -122,3 +122,111 @@ describe('Employee creation (EMP-CREATE)', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('Employee update (EMP-UPDATE)', () => {
+  const seed = (overrides) =>
+    request(app).post('/api/employees').set('Authorization', `Bearer ${token}`).send(validEmployee(overrides));
+
+  test('EMP-12 updates allowed fields', async () => {
+    await seed();
+    const res = await request(app)
+      .patch('/api/employees/1')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ jobTitle: 'Staff Engineer', salary: 200000, department: 'sales' });
+    expect(res.status).toBe(200);
+    expect(res.body.employee).toMatchObject({ jobTitle: 'Staff Engineer', salary: 200000, department: 'sales' });
+    expect(res.body.employee.updatedAt).toBeDefined();
+  });
+
+  test('EMP-13 returns 404 for unknown employee', async () => {
+    const res = await request(app)
+      .patch('/api/employees/999')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ jobTitle: 'x' });
+    expect(res.status).toBe(404);
+  });
+
+  test('EMP-14 rejects unauthenticated update', async () => {
+    await seed();
+    const res = await request(app).patch('/api/employees/1').send({ jobTitle: 'x' });
+    expect(res.status).toBe(401);
+  });
+
+  test('EMP-15 rejects invalid department on update', async () => {
+    await seed();
+    const res = await request(app)
+      .patch('/api/employees/1')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ department: 'astronaut' });
+    expect(res.status).toBe(400);
+  });
+
+  test('EMP-16 rejects duplicate email on update', async () => {
+    await seed();
+    await seed({ email: 'sam@shopease.com' });
+    const res = await request(app)
+      .patch('/api/employees/2')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ email: 'ADA@shopease.com' });
+    expect(res.status).toBe(409);
+  });
+
+  test('EMP-17 allows updating status', async () => {
+    await seed();
+    const res = await request(app)
+      .patch('/api/employees/1')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'terminated' });
+    expect(res.status).toBe(200);
+    expect(res.body.employee.status).toBe('terminated');
+  });
+
+  test('EMP-18 rejects invalid status', async () => {
+    await seed();
+    const res = await request(app)
+      .patch('/api/employees/1')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'on-vacation' });
+    expect(res.status).toBe(400);
+  });
+
+  test('EMP-19 rejects self-managing employee', async () => {
+    await seed();
+    const res = await request(app)
+      .patch('/api/employees/1')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ managerId: 1 });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('Employee delete (EMP-DELETE)', () => {
+  const seed = (overrides) =>
+    request(app).post('/api/employees').set('Authorization', `Bearer ${token}`).send(validEmployee(overrides));
+
+  test('EMP-20 deletes an employee', async () => {
+    await seed();
+    const res = await request(app).delete('/api/employees/1').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    const check = await request(app).get('/api/employees/1').set('Authorization', `Bearer ${token}`);
+    expect(check.status).toBe(404);
+  });
+
+  test('EMP-21 returns 404 for unknown employee', async () => {
+    const res = await request(app).delete('/api/employees/999').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(404);
+  });
+
+  test('EMP-22 rejects unauthenticated delete', async () => {
+    await seed();
+    const res = await request(app).delete('/api/employees/1');
+    expect(res.status).toBe(401);
+  });
+
+  test('EMP-23 refuses to delete an employee who manages others', async () => {
+    await seed();
+    await seed({ email: 'grace@shopease.com', managerId: 1 });
+    const res = await request(app).delete('/api/employees/1').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(409);
+  });
+});

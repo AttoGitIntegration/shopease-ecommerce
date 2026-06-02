@@ -70,3 +70,62 @@ exports.getById = (req, res) => {
   if (!employee) return res.status(404).json({ error: 'Employee not found' });
   res.json(employee);
 };
+
+const UPDATABLE = ['firstName', 'lastName', 'email', 'department', 'jobTitle', 'employmentType', 'salary', 'managerId', 'status'];
+const STATUSES = ['active', 'inactive', 'terminated'];
+
+exports.update = (req, res) => {
+  const id = parseInt(req.params.id);
+  const employee = employees.find(e => e.id === id);
+  if (!employee) return res.status(404).json({ error: 'Employee not found' });
+
+  const updates = {};
+  for (const field of UPDATABLE) {
+    if (req.body[field] !== undefined) updates[field] = req.body[field];
+  }
+
+  if (updates.email !== undefined) {
+    if (!EMAIL_RE.test(updates.email)) return res.status(400).json({ error: 'Valid email required' });
+    const email = String(updates.email).toLowerCase();
+    if (employees.find(e => e.email === email && e.id !== id))
+      return res.status(409).json({ error: 'Email already in use' });
+    updates.email = email;
+  }
+  if (updates.firstName !== undefined && !updates.firstName) return res.status(400).json({ error: 'firstName cannot be empty' });
+  if (updates.lastName !== undefined && !updates.lastName) return res.status(400).json({ error: 'lastName cannot be empty' });
+  if (updates.department !== undefined && !DEPARTMENTS.includes(updates.department))
+    return res.status(400).json({ error: `department must be one of ${DEPARTMENTS.join(', ')}` });
+  if (updates.jobTitle !== undefined && !updates.jobTitle) return res.status(400).json({ error: 'jobTitle cannot be empty' });
+  if (updates.employmentType !== undefined && !EMPLOYMENT_TYPES.includes(updates.employmentType))
+    return res.status(400).json({ error: `employmentType must be one of ${EMPLOYMENT_TYPES.join(', ')}` });
+  if (updates.status !== undefined && !STATUSES.includes(updates.status))
+    return res.status(400).json({ error: `status must be one of ${STATUSES.join(', ')}` });
+  if (updates.salary !== undefined) {
+    const s = Number(updates.salary);
+    if (!Number.isFinite(s) || s < 0) return res.status(400).json({ error: 'salary must be a non-negative number' });
+    updates.salary = s;
+  }
+  if (updates.managerId !== undefined && updates.managerId !== null) {
+    const managerId = parseInt(updates.managerId);
+    if (managerId === id) return res.status(400).json({ error: 'employee cannot be their own manager' });
+    if (!employees.find(e => e.id === managerId))
+      return res.status(400).json({ error: 'managerId does not reference an existing employee' });
+    updates.managerId = managerId;
+  }
+
+  Object.assign(employee, updates, { updatedBy: req.adminId || null, updatedAt: new Date().toISOString() });
+
+  res.json({ message: 'Employee updated', employee });
+};
+
+exports.remove = (req, res) => {
+  const id = parseInt(req.params.id);
+  const index = employees.findIndex(e => e.id === id);
+  if (index === -1) return res.status(404).json({ error: 'Employee not found' });
+
+  if (employees.find(e => e.managerId === id))
+    return res.status(409).json({ error: 'Cannot delete an employee who manages others' });
+
+  const [employee] = employees.splice(index, 1);
+  res.json({ message: 'Employee deleted', employee });
+};
