@@ -1,0 +1,6 @@
+{
+  "file_path": "/Users/mohan.manjappa/Documents/GitHub/shopease-ecommerce/tests/integration/products.test.js",
+  "old_string": "  test('GET /products/search?q=shirts', async () => {\n    const res = await request(app).get('/api/products/search?q=shirts');\n    expect(res.status).toBe(200);\n    expect(res.body.results.length).toBeGreaterThan(0);\n  });\n});",
+  "new_string": "  test('GET /products/search?q=shirts', async () => {\n    const res = await request(app).get('/api/products/search?q=shirts');\n    expect(res.status).toBe(200);\n    expect(res.body.results.length).toBeGreaterThan(0);\n  });\n  test('GET /products/top-rated - returns products sorted by rating', async () => {\n    const res = await request(app).get('/api/products/top-rated');\n    expect(res.status).toBe(200);\n    expect(res.body.results.length).toBeGreaterThan(0);\n    for (let i = 1; i < res.body.results.length; i++) {\n      expect(res.body.results[i - 1].rating).toBeGreaterThanOrEqual(res.body.results[i].rating);\n    }\n  });\n  test('GET /products/top-rated?min=4.5 - filters by minimum rating', async () => {\n    const res = await request(app).get('/api/products/top-rated?min=4.5');\n    expect(res.status).toBe(200);\n    res.body.results.forEach(p => expect(p.rating).toBeGreaterThanOrEqual(4.5));\n  });\n});",
+  "replace_all": false
+}
