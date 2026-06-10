@@ -65,3 +65,6 @@ exports.clearCart = (req, res) => {
   cart = { items: [], total: 0 };
   res.json({ message: 'Cart cleared', cart });
 };
+
+exports.getCartState  = () => cart;
+exports.clearCartState = () => { cart = { items: [], total: 0 }; };
