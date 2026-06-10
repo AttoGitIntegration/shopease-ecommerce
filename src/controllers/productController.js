@@ -14,3 +14,49 @@ exports.search  = (req, res) => {
   if (maxPrice) results = results.filter(p => p.price <= parseInt(maxPrice));
   res.json({ results, count: results.length });
 };
+exports.categories = (req, res) => {
+  const counts = products.reduce((acc, p) => {
+    acc[p.category] = (acc[p.category] || 0) + 1;
+    return acc;
+  }, {});
+  const categories = Object.entries(counts).map(([name, count]) => ({ name, count }));
+  res.json({ categories, total: categories.length });
+};
+exports.byCategory = (req, res) => {
+  const name = req.params.name;
+  const results = products.filter(p => p.category.toLowerCase() === name.toLowerCase());
+  if (results.length === 0) return res.status(404).json({ error: 'Category not found' });
+  res.json({ category: results[0].category, products: results, count: results.length });
+};
+exports.stock = (req, res) => {
+  const product = products.find(p => p.id === parseInt(req.params.id));
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+  res.json({ productId: product.id, stock: product.stock, inStock: product.stock > 0 });
+};
+exports.select  = (req, res) => {
+  const product = products.find(p => p.id === parseInt(req.params.id));
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+  if (product.status === 'cancelled') return res.status(400).json({ error: 'Product is cancelled and unavailable' });
+  const quantity = parseInt(req.body.quantity) || 1;
+  if (quantity <= 0) return res.status(400).json({ error: 'quantity must be positive' });
+  if (quantity > product.stock) return res.status(400).json({ error: 'Insufficient stock', available: product.stock });
+  const selection = {
+    productId: product.id,
+    name: product.name,
+    price: product.price,
+    quantity,
+    lineTotal: product.price * quantity
+  };
+  res.json({ message: 'Product selected', selection });
+};
+exports.cancel  = (req, res) => {
+  const product = products.find(p => p.id === parseInt(req.params.id));
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+  if (product.status === 'cancelled') return res.status(400).json({ error: 'Product already cancelled' });
+  const reason = req.body?.reason;
+  if (!reason) return res.status(400).json({ error: 'reason required' });
+  product.status = 'cancelled';
+  product.cancelledAt = new Date();
+  product.cancellationReason = reason;
+  res.json({ message: 'Product cancelled', product });
+};
