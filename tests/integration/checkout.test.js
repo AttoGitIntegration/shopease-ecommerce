@@ -94,4 +94,100 @@ describe('Checkout API', () => {
     await request(app).delete('/api/checkout');
     await request(app).delete('/api/cart/clear');
   });
+
+  describe('GET /checkout/amount', () => {
+    test('returns 400 when cart is empty and no session', async () => {
+      await request(app).delete('/api/cart/clear');
+      const res = await request(app).get('/api/checkout/amount');
+      expect(res.status).toBe(400);
+    });
+
+    test('returns amount breakdown from cart when no session active', async () => {
+      await request(app).post('/api/cart/add')
+        .send({ productId: 1, name: 'Wireless Headphones', price: 2999, quantity: 2 });
+      const res = await request(app).get('/api/checkout/amount');
+      expect(res.status).toBe(200);
+      expect(res.body.source).toBe('cart');
+      expect(res.body.subtotal).toBe(5998);
+      expect(res.body.tax).toBe(Math.round(5998 * 0.08));
+      expect(res.body.shipping).toBe(0);
+      expect(res.body.discount).toBe(0);
+      expect(res.body.total).toBe(5998 + Math.round(5998 * 0.08));
+      expect(res.body.items[0].lineTotal).toBe(5998);
+    });
+
+    test('returns amount breakdown from session when session is active', async () => {
+      await request(app).post('/api/checkout/initiate');
+      const res = await request(app).get('/api/checkout/amount');
+      expect(res.status).toBe(200);
+      expect(res.body.source).toBe('session');
+      expect(res.body.subtotal).toBe(5998);
+      await request(app).delete('/api/checkout');
+      await request(app).delete('/api/cart/clear');
+    });
+  });
+
+  describe('POST /checkout/coupon', () => {
+    beforeEach(async () => {
+      await request(app).delete('/api/cart/clear');
+      await request(app).post('/api/cart/add')
+        .send({ productId: 1, name: 'Wireless Headphones', price: 2999, quantity: 1 });
+      await request(app).post('/api/checkout/initiate');
+    });
+
+    afterEach(async () => {
+      await request(app).delete('/api/checkout');
+      await request(app).delete('/api/cart/clear');
+    });
+
+    test('rejects missing coupon code', async () => {
+      const res = await request(app).post('/api/checkout/coupon').send({});
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/code required/i);
+    });
+
+    test('rejects invalid coupon code', async () => {
+      const res = await request(app).post('/api/checkout/coupon').send({ code: 'INVALID' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/invalid coupon/i);
+    });
+
+    test('applies percent coupon SAVE10 correctly', async () => {
+      const res = await request(app).post('/api/checkout/coupon').send({ code: 'SAVE10' });
+      expect(res.status).toBe(200);
+      const expectedDiscount = Math.round(2999 * 0.10);
+      expect(res.body.coupon.code).toBe('SAVE10');
+      expect(res.body.coupon.discount).toBe(expectedDiscount);
+      expect(res.body.totals.discount).toBe(expectedDiscount);
+      expect(res.body.totals.total).toBe(res.body.totals.subtotal + res.body.totals.tax + res.body.totals.shipping - expectedDiscount);
+    });
+
+    test('applies flat coupon FLAT50 correctly', async () => {
+      const res = await request(app).post('/api/checkout/coupon').send({ code: 'FLAT50' });
+      expect(res.status).toBe(200);
+      expect(res.body.coupon.code).toBe('FLAT50');
+      expect(res.body.coupon.discount).toBe(50);
+      expect(res.body.totals.total).toBe(res.body.totals.subtotal + res.body.totals.tax + res.body.totals.shipping - 50);
+    });
+
+    test('coupon is case-insensitive', async () => {
+      const res = await request(app).post('/api/checkout/coupon').send({ code: 'save10' });
+      expect(res.status).toBe(200);
+      expect(res.body.coupon.code).toBe('SAVE10');
+    });
+
+    test('GET /amount reflects applied coupon discount', async () => {
+      await request(app).post('/api/checkout/coupon').send({ code: 'FLAT50' });
+      const res = await request(app).get('/api/checkout/amount');
+      expect(res.status).toBe(200);
+      expect(res.body.discount).toBe(50);
+      expect(res.body.coupon.code).toBe('FLAT50');
+    });
+
+    test('returns 404 when no active session', async () => {
+      await request(app).delete('/api/checkout');
+      const res = await request(app).post('/api/checkout/coupon').send({ code: 'SAVE10' });
+      expect(res.status).toBe(404);
+    });
+  });
 });
