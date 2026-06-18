@@ -55,6 +55,22 @@ exports.select  = (req, res) => {
   };
   res.json({ message: 'Product selected', selection });
 };
+exports.topRated = (req, res) => {
+  const min = parseFloat(req.query.min) || 0;
+  const results = [...products]
+    .filter(p => p.rating >= min)
+    .sort((a, b) => b.rating - a.rating);
+  res.json({ results, count: results.length });
+};
+exports.priceRange = (req, res) => {
+  const { category } = req.query;
+  let pool = category
+    ? products.filter(p => p.category.toLowerCase() === category.toLowerCase())
+    : products;
+  if (pool.length === 0) return res.status(404).json({ error: 'No products found' });
+  const prices = pool.map(p => p.price);
+  res.json({ category: category || 'all', minPrice: Math.min(...prices), maxPrice: Math.max(...prices) });
+};
 exports.cancel  = (req, res) => {
   const product = products.find(p => p.id === parseInt(req.params.id));
   if (!product) return res.status(404).json({ error: 'Product not found' });

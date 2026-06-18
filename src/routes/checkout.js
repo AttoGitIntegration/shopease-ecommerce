@@ -1,7 +1,9 @@
 const router = require('express').Router();
-const { initiate, getSession, setShipping, setPayment, processPayment, confirm, cancel } = require('../controllers/checkoutController');
+const { initiate, getSession, getAmount, applyCoupon, setShipping, setPayment, processPayment, confirm, cancel } = require('../controllers/checkoutController');
 router.post('/initiate', initiate);
 router.get('/',          getSession);
+router.get('/amount',    getAmount);
+router.post('/coupon',   applyCoupon);
 router.post('/shipping', setShipping);
 router.post('/payment',  setPayment);
 router.post('/pay',      processPayment);
