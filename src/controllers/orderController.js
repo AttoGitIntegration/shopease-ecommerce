@@ -104,6 +104,7 @@ exports.getReturnStatus = (req, res) => {
     refundMethod: order.refundMethod || null,
     refundTransactionId: order.refundTransactionId || null
   });
+};
 exports.getOrdersByUser = (req, res) => {
   const userId = parseInt(req.params.userId);
   const userOrders = orders.filter(o => o.userId === userId);
