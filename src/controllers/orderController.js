@@ -1,4 +1,10 @@
 const orders = [];
+const OTP_EXPIRY_MINUTES = 30;
+
+function generateOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 exports.placeOrder   = (req, res) => {
   const { userId, items, address } = req.body;
   if (!userId || !items?.length || !address) return res.status(400).json({ error: 'userId, items and address required' });
@@ -104,8 +110,65 @@ exports.getReturnStatus = (req, res) => {
     refundMethod: order.refundMethod || null,
     refundTransactionId: order.refundTransactionId || null
   });
+};
 exports.getOrdersByUser = (req, res) => {
   const userId = parseInt(req.params.userId);
   const userOrders = orders.filter(o => o.userId === userId);
   res.json({ orders: userOrders, total: userOrders.length });
+};
+exports.shipOrder = (req, res) => {
+  const order = orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status !== 'placed') {
+    return res.status(400).json({ error: `Cannot ship ${order.status} order` });
+  }
+  const otp = generateOtp();
+  order.status = 'shipped';
+  order.shippedAt = new Date();
+  order.deliveryOtp = otp;
+  order.deliveryOtpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+  order.deliveryOtpVerified = false;
+  res.json({
+    message: 'Order shipped, delivery OTP generated',
+    orderId: order.id,
+    deliveryOtp: otp,
+    otpExpiresAt: order.deliveryOtpExpiresAt
+  });
+};
+exports.verifyDeliveryOtp = (req, res) => {
+  const order = orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status !== 'shipped') {
+    return res.status(400).json({ error: `OTP verification only valid for shipped orders, current status: ${order.status}` });
+  }
+  const { otp } = req.body;
+  if (!otp) return res.status(400).json({ error: 'otp required' });
+  if (new Date() > new Date(order.deliveryOtpExpiresAt)) {
+    return res.status(400).json({ error: 'OTP has expired, please request a new one' });
+  }
+  if (otp !== order.deliveryOtp) {
+    return res.status(400).json({ error: 'Invalid OTP' });
+  }
+  order.status = 'delivered';
+  order.deliveredAt = new Date();
+  order.deliveryOtpVerified = true;
+  order.deliveryOtp = null;
+  order.deliveryOtpExpiresAt = null;
+  res.json({ message: 'Delivery verified successfully', order });
+};
+exports.regenerateDeliveryOtp = (req, res) => {
+  const order = orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status !== 'shipped') {
+    return res.status(400).json({ error: `Can only regenerate OTP for shipped orders, current status: ${order.status}` });
+  }
+  const otp = generateOtp();
+  order.deliveryOtp = otp;
+  order.deliveryOtpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+  res.json({
+    message: 'New delivery OTP generated',
+    orderId: order.id,
+    deliveryOtp: otp,
+    otpExpiresAt: order.deliveryOtpExpiresAt
+  });
 };
