@@ -4,6 +4,7 @@ app.use(express.json());
 app.use('/api/auth',     require('./routes/auth'));
 app.use('/api/auth/azure-devops', require('./routes/azureDevOpsAuth'));
 app.use('/api/auth/google', require('./routes/googleAuth'));
+app.use('/api/auth/github', require('./routes/githubAuth'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/cart',     require('./routes/cart'));
 app.use('/api/checkout', require('./routes/checkout'));
