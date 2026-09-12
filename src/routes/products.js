@@ -1,11 +1,5 @@
 const router = require('express').Router();
-const { getAll, getById, search, select, cancel } = require('../controllers/productController');
-router.get('/',             getAll);
-router.get('/search',       search);
-router.get('/:id',          getById);
-router.post('/:id/select',  select);
-router.put('/:id/cancel',   cancel);
-const { getAll, getById, search, select, categories, byCategory, stock } = require('../controllers/productController');
+const { getAll, getById, search, select, cancel, categories, byCategory, stock } = require('../controllers/productController');
 router.get('/',               getAll);
 router.get('/search',         search);
 router.get('/categories',     categories);
@@ -13,4 +7,5 @@ router.get('/category/:name', byCategory);
 router.get('/:id/stock',      stock);
 router.get('/:id',            getById);
 router.post('/:id/select',    select);
+router.put('/:id/cancel',     cancel);
 module.exports = router;
