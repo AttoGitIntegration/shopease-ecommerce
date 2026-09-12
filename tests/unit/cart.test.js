@@ -17,4 +17,10 @@ describe('Cart API', () => {
     expect(res.status).toBe(200);
     expect(res.body.cart.items).toHaveLength(0);
   });
+  test('GET /cart/count - returns itemCount and productCount', async () => {
+    const res = await request(app).get('/api/cart/count');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('itemCount');
+    expect(res.body).toHaveProperty('productCount');
+  });
 });

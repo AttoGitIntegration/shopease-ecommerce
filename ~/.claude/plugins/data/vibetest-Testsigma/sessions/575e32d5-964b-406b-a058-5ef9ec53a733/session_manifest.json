@@ -1,0 +1,36 @@
+{
+  "session_id": "575e32d5-964b-406b-a058-5ef9ec53a733",
+  "cwd": "/Users/mohan.manjappa/Documents/GitHub/shopease-ecommerce",
+  "transcript_path": "/Users/mohan.manjappa/.claude/projects/-Users-mohan-manjappa-Documents-GitHub-shopease-ecommerce/575e32d5-964b-406b-a058-5ef9ec53a733.jsonl",
+  "last_hook": "Stop",
+  "updated_at": "2026-05-05T10:23:52.933265+00:00",
+  "grouping_keys": {
+    "git_branches_union": [
+      "dummy-branch"
+    ],
+    "git_branch_current": "dummy-branch",
+    "git_branch": "dummy-branch",
+    "ticket_ids_from_branch": [],
+    "signal_sources": {
+      "branch_detected_via": "git_rev_parse",
+      "branch_detected_at_hook": "SessionStart",
+      "user_prompt_submit_count": 1,
+      "first_prompt_captured": true
+    },
+    "git_repo": "https://github.com/AttoGitIntegration/shopease-ecommerce.git",
+    "git_user": "mohan.manjappa@testsigma.com",
+    "git_name": "mohanmanjappa-testsigma",
+    "recommended_signals": {
+      "tier1_branch_ticket": "Put the ticket in the branch name (e.g. feature/PROJ-123-desc) for strongest auto-grouping.",
+      "tier2_prompt_ticket": "Mention PROJ-123 in any user message (first or follow-up) when not on a ticket branch.",
+      "tier3_conventional_commits": "feat(PROJ-123): ... in commits adds a fallback signal if captured elsewhere."
+    },
+    "ticket_ids_from_prompts": [],
+    "first_user_prompt_preview": "Add one more route to products.",
+    "ticket_ids_from_first_prompt": []
+  },
+  "testsigma": {
+    "claude_session_id": "575e32d5-964b-406b-a058-5ef9ec53a733",
+    "link_source": "api_failed"
+  }
+}

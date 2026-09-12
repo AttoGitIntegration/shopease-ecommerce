@@ -1,0 +1,6 @@
+{
+  "file_path": "/Users/mohan.manjappa/Documents/GitHub/shopease-ecommerce/src/controllers/productController.js",
+  "old_string": "exports.cancel  = (req, res) => {",
+  "new_string": "exports.topRated = (req, res) => {\n  const min = parseFloat(req.query.min) || 0;\n  const results = [...products]\n    .filter(p => p.rating >= min)\n    .sort((a, b) => b.rating - a.rating);\n  res.json({ results, count: results.length });\n};\nexports.cancel  = (req, res) => {",
+  "replace_all": false
+}
